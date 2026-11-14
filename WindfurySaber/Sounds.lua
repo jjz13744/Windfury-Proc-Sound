@@ -1,0 +1,23 @@
+local _, ns = ...
+ns.sounds = {
+    { id = "lightsaber", name = "Sci-fi blade", file = "lightsaber.ogg" },
+    { id = "wolf_howl", name = "Wolf Howl", file = "wolf_howl.ogg" },
+    { id = "chicken", name = "Chicken", file = "chicken.ogg" },
+    { id = "laser_pulse", name = "Laser Pulse", file = "laser_pulse.ogg" },
+    { id = "laser_burst", name = "Laser Burst", file = "laser_burst.ogg" },
+    { id = "laser_zing", name = "Laser Zing", file = "laser_zing.ogg" },
+    { id = "phaser_drop", name = "Phaser Drop", file = "phaser_drop.ogg" },
+    { id = "phaser_rise", name = "Phaser Rise", file = "phaser_rise.ogg" },
+    { id = "power_up", name = "Power-Up", file = "power_up.ogg" },
+    { id = "arcade_bonus", name = "Arcade Bonus", file = "arcade_bonus.ogg" },
+    { id = "victory_ping", name = "Victory Ping", file = "victory_ping.ogg" },
+    { id = "high_swoop", name = "High Swoop", file = "high_swoop.ogg" },
+    { id = "bass_drop", name = "Bass Drop", file = "bass_drop.ogg" },
+    { id = "triple_boop", name = "Triple Boop", file = "triple_boop.ogg" },
+    { id = "happy_blip", name = "Happy Blip", file = "happy_blip.ogg" },
+    { id = "phase_jump", name = "Phase Jump", file = "phase_jump.ogg" },
+    { id = "space_crackle", name = "Space Crackle", file = "space_crackle.ogg" },
+    { id = "three_tone", name = "Three-Tone Chime", file = "three_tone.ogg" },
+    { id = "electric_zap", name = "Electric Zap", file = "electric_zap.ogg" },
+    { id = "double_zap", name = "Double Zap", file = "double_zap.ogg" },
+}
