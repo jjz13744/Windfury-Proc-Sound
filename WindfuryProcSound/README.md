@@ -2,7 +2,7 @@
 
 A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes wolf howl, chicken, and an original sci-fi blade cue.
 
-**Status: 0.2.1 diagnostic build.** A live user report showed no detection on a Windfury proc. This update adds an opt-in event trace to investigate that failure; it does not claim to fix proc detection. Automated tests cover the Lua logic with mocked APIs, not actual combat-event delivery.
+**Status: 0.2.2 event-detection fix.** Separate live traces showed two Weapon procs with two matching cooldown events, then two Totem procs with two different matching events. This version uses those distinct signatures. Automated replays pass; audible playback with this version and isolation from other players still need live verification.
 
 ## Install on Windows
 
@@ -47,9 +47,15 @@ Only one cue plays at a time. A new cue stops the preceding one to prevent audio
 
 ## Proc detection
 
-The detector uses `UNIT_SPELLCAST_SUCCEEDED` registered for the player, plus newly added player `UNIT_AURA` entries as a fallback. The configured legacy proc IDs came from GaleCount. They are not proof that Forever sends matching cast or aura events. Applying the weapon imbue or dropping the totem is excluded by these filters. Another unit's cast is ignored. The addon does not read the combat log or damage numbers.
+The main detector uses exact `SPELL_UPDATE_COOLDOWN` payloads:
 
-A 0.25-second matching window suppresses duplicate cast/aura notifications of the same proc. Distinct same-source notifications remain distinct. Since the game does not supply a common public identifier across both sources, extremely closely spaced incomplete event sequences can be ambiguous. Restricted values are discarded before comparison or table indexing. Full aura snapshots are not treated as new procs.
+- **Windfury Weapon:** spell `439440`, base spell nil, category `0`, recovery category `0`, item nil. Enabled only on a shaman.
+- **Windfury Totem:** spell `8516`, `10608`, or `10610`, base spell nil, category `2619`, recovery category `0`, item nil. Totem recipients may be any player class. The rank-1 signature (`8516`) was observed live; higher ranks are mapped from the known proc family and are not yet live-tested.
+
+Weapon and Totem have independent toggles and counts. The summon IDs `8512`, `10613`, `10614`, passive totem-buff IDs, and weapon-imbue application casts are excluded. Generic cooldown refreshes, GCD events, item events, unknown signatures and restricted values are ignored. No damage timing, target-hit inference, combat log, or other-player unit feed is used.
+
+Readable player casts and newly added player auras remain a legacy fallback. The failed original implementation relied on those events alone; the isolated traces showed only cooldown notifications for the observed procs.
+A 0.25-second matching window suppresses duplicate cooldown/cast/aura notifications of the same proc type. Distinct same-source notifications remain distinct. Since the game does not supply a common public identifier across the sources, extremely closely spaced incomplete event sequences can be ambiguous. Restricted values are discarded before comparison or table indexing. Full aura snapshots are not treated as new procs.
 
 No WeakAuras, GaleCount, or other addon is required. No hidden combat data is extracted or bypassed. No networking or telemetry is included.
 
@@ -68,7 +74,7 @@ For a short diagnostic capture:
 3. Share the summary and whether you observed your own proc. Separately test with another player proccing while you do not attack.
 4. `/reload` or normal logout saves the trace with addon settings. Do this when convenient, outside combat. `/wfps trace clear` removes it.
 
-The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Cooldown events are **diagnostic only** and cannot play a sound. The observed candidate `439440, nil, 0, 0, nil` requires live ownership and completeness checks before it can be used as a trigger. See `SOURCES.md`.
+The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Tracing does not change normal sound triggers. Version 0.2.2 uses the two isolated cooldown signatures above. Party isolation, additional client builds and higher Totem ranks remain unverified. See `SOURCES.md`.
 
 ## Sound rights and provenance
 
@@ -77,7 +83,7 @@ The bundled sci-fi blade is an **original synthesized sound**, not the exact aud
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.2.1.zip`.
+- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.2.2.zip`.
 - Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
 - `ffmpeg`/`ffprobe` can verify that all bundled OGG files decode successfully.
 

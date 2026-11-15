@@ -96,10 +96,26 @@ local function legacyLoaded()
     return ok and loaded == true
 end
 
+local function syncCooldownEvent()
+    -- Totem procs can affect any player class; only Weapon's signature is
+    -- shaman-gated. These are the local client's public cooldown events.
+    local ok, result = pcall(frame.RegisterEvent, frame, "SPELL_UPDATE_COOLDOWN")
+    ns.registered.SPELL_UPDATE_COOLDOWN = ok and result ~= false
+end
+
+local function refreshPlayerClass()
+    ns.isShaman = false
+    if type(UnitClass) == "function" then
+        local ok, _, class = pcall(UnitClass, "player")
+        if ok and not Core.IsSecret(class) and type(class) == "string" then ns.isShaman = class == "SHAMAN" end
+    end
+    syncCooldownEvent()
+end
+
 function ns.StopTrace(announce)
     if ns.trace then ns.trace.active = false end
     frame:SetScript("OnUpdate", nil)
-    frame:UnregisterEvent("SPELL_UPDATE_COOLDOWN")
+    syncCooldownEvent()
     if announce then ns.Print("Trace stopped. Use /wfps trace show to view it, then /reload when convenient to save it.") end
 end
 
@@ -107,12 +123,12 @@ function ns.StartTrace()
     ns.StopTrace(false)
     ns.trace = Core.NewTrace(GetTime())
     ns.db.lastTrace = ns.trace
-    local ok, result = pcall(frame.RegisterEvent, frame, "SPELL_UPDATE_COOLDOWN")
-    ns.trace.cooldownRegistered = ok and result ~= false
+    syncCooldownEvent()
+    ns.trace.cooldownRegistered = ns.registered.SPELL_UPDATE_COOLDOWN
     frame:SetScript("OnUpdate", function()
         if ns.trace and ns.trace.active and GetTime() >= ns.trace.expires then ns.StopTrace(true) end
     end)
-    ns.Print("30-second diagnostic trace started. Trigger one Windfury proc, then /wfps trace show. This does not change sound triggers.")
+    ns.Print("30-second diagnostic trace started. Trigger one Windfury proc, then /wfps trace show. Normal sound triggers remain enabled.")
     if not ns.trace.cooldownRegistered then ns.Print("Cooldown event unavailable; tracing readable player casts and auras only.") end
 end
 
@@ -120,7 +136,7 @@ function ns.ShowTrace()
     ns.StopTrace(false)
     local trace = ns.trace
     if not trace then ns.Print("No trace yet. Use /wfps trace on."); return end
-    ns.Print("Trace: " .. #trace.rows .. " rows, " .. trace.total .. " events, " .. trace.dropped .. " rows omitted. Cooldown rows are diagnostic only.")
+    ns.Print("Trace: " .. #trace.rows .. " rows, " .. trace.total .. " events, " .. trace.dropped .. " rows omitted. This is a public-event trace.")
     local grouped, order = {}, {}
     for _, row in ipairs(trace.rows) do
         local key = row.source .. " id=" .. tostring(row.spellID)
@@ -143,10 +159,11 @@ end
 function ns.Status()
     local d = ns.detector
     if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
-    ns.Print("Version 0.2.1 diagnostics; cast/aura-only trigger. Cooldown trace never plays a sound.")
+    ns.Print("Version 0.2.2; separate Weapon and Totem cooldown signatures.")
     ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.GetSound(ns.db.sound).name .. "; " .. ns.db.channel .. " channel.")
-    ns.Print("This session: " .. d.count .. " detected procs, " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures.")
-    ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ". Live Forever validation is still needed.")
+    ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures.")
+    ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ", cooldown=" .. tostring(ns.registered.SPELL_UPDATE_COOLDOWN) .. ", shaman=" .. tostring(ns.isShaman) .. ".")
+    ns.Print("Both own-proc signals observed; playback and other-player isolation still need live verification.")
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
@@ -165,14 +182,23 @@ frame:SetScript("OnEvent", function(_, event, ...)
         ready = true
         registerUnit("UNIT_SPELLCAST_SUCCEEDED")
         registerUnit("UNIT_AURA")
+        refreshPlayerClass()
         frame:RegisterEvent("PLAYER_ENTERING_WORLD")
         if ns.RegisterSettings then ns.RegisterSettings() end
         frame:UnregisterEvent("ADDON_LOADED")
     elseif ready and event == "PLAYER_ENTERING_WORLD" then
         ns.detector.events = {}
+        refreshPlayerClass()
     elseif ready and event == "SPELL_UPDATE_COOLDOWN" then
         local spellID, baseSpellID, category, startRecoveryCategory, itemID = ...
         Core.TraceRecord(ns.trace, "cooldown", spellID, GetTime(), baseSpellID, category, startRecoveryCategory, itemID)
+        if not ns.legacyActive then
+            local kind, restricted = Core.MatchCooldown(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+            if restricted then ns.detector.restricted = ns.detector.restricted + 1 end
+            if kind == "totem" or (kind == "weapon" and ns.isShaman) then
+                ns.detector:Observe(spellID, "cooldown", nil, GetTime(), ns.db)
+            end
+        end
     elseif ready and event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, castGUID, spellID = ...
         if playerUnit(unit) then observe(spellID, "cast", castGUID) end

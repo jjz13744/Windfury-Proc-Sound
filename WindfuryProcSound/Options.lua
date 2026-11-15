@@ -68,8 +68,8 @@ local function makeWindow()
         button(window, "Play", 62, x + 202, y, function() ns.Play(choice.id, true) end)
     end
     summary = label(window, "", 24, -468 - extraHeight, "GameFontHighlight")
-    label(window, "Proc detection uses readable player events only. Restricted events are skipped.", 24, -493 - extraHeight, "GameFontHighlightSmall")
-    label(window, "Use /wfps status for diagnostics. In-game Forever verification is still required.", 24, -510 - extraHeight, "GameFontHighlightSmall")
+    label(window, "Separate Weapon / Totem cooldown signatures. Restricted values are skipped.", 24, -493 - extraHeight, "GameFontHighlightSmall")
+    label(window, "Use /wfps status for counts. Live playback and party isolation need verification.", 24, -510 - extraHeight, "GameFontHighlightSmall")
     button(window, "Diagnostics", 115, 24, -532 - extraHeight, ns.Status)
     button(window, "Close", 90, 480, -532 - extraHeight, function() window:Hide() end)
     UISpecialFrames[#UISpecialFrames + 1] = "WindfuryProcSoundOptions"

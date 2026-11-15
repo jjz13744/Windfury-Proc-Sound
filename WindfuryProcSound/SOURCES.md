@@ -27,3 +27,14 @@ A user reported an actual proc without a sound. Their status showed registered c
   https://www.curseforge.com/wow/addons/zakleciojebacz-forever
 
 The native aura-sound API exists, but no evidence yet establishes that a Windfury proc produces a matching native aura notification. No API restriction is bypassed by this diagnostic build.
+
+## Isolated trace follow-up (version 0.2.2)
+
+The user then ran separate tests and reported two observed procs in each:
+
+- Weapon imbue only: 439440, nil, 0, 0, nil occurred twice. One unrelated 16257 event had nil category fields.
+- Totem only: 8516, nil, 2619, 0, nil occurred twice. Two unrelated 16257 events had nil category fields.
+
+Neither trace showed a matching player cast or added aura. Both trace screenshots had zero omitted rows. These are direct user-supplied live observations; the implementation now matches these two exact payloads, with separate counters and settings. Summon/application IDs are not used. The Totem rank mapping 10608/10610 is retained from GaleCount's proc family, but those ranks are not yet live-tested. Tests replay the observations through the real addon handlers with mocked playback.
+
+This establishes the observed signatures, not universal event delivery or audible playback of this new version. Other-player isolation still needs a negative test. The addon reads only public local-client cooldown fields, never reconstructs target hit timing, and does not bypass secret restrictions.

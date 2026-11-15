@@ -152,7 +152,7 @@ event(ns.frame,"UNIT_AURA","player",{updatedAuraInstanceIDs={17}})
 check(ns.trace.rows[3].source == "aura-update" and ns.trace.rows[3].spellID == 439441, "updated aura traced without counting as proc")
 check(ns.detector.count == procBefore, "aura refresh trace does not become proc")
 SlashCmdList.WINDFURYPROCSOUND("trace show")
-check(not ns.trace.active and not ns.frame.registered.SPELL_UPDATE_COOLDOWN, "show stops trace and unregisters cooldown")
+check(not ns.trace.active and ns.frame.registered.SPELL_UPDATE_COOLDOWN, "show stops trace but preserves automatic cooldown listener")
 check(ns.db.lastTrace == ns.trace, "trace retained in existing saved settings")
 SlashCmdList.WINDFURYPROCSOUND("trace on")
 clock=331
@@ -202,4 +202,120 @@ assert(loadfile("WindfuryProcSound/Addon.lua"))("WindfuryProcSound", subsequent)
 subsequent.frame.scripts.OnEvent(subsequent.frame, "ADDON_LOADED", "WindfuryProcSound")
 check(subsequent.db.sound == "lightsabercrit_proc", "new settings take precedence over legacy")
 check(not subsequent.legacyActive, "automatic cues resume without legacy addon")
-print("PASS: " .. tests .. " assertions (Lua logic and mocked WoW APIs). No live game test.")
+
+
+-- Replay the isolated live weapon trace against actual runtime handlers.
+local runtime = {}
+WindfuryProcSoundDB={enabled=true,weapon=true,totem=true,sound="lightsabercrit_proc",channel="Master"}
+UnitClass=function() return "Shaman","SHAMAN" end
+PlaySoundFile=function(path, channel) played[#played+1]={path,channel}; return true,#played end
+assert(loadfile("WindfuryProcSound/Core.lua"))("WindfuryProcSound", runtime)
+assert(loadfile("WindfuryProcSound/Sounds.lua"))("WindfuryProcSound", runtime)
+assert(loadfile("WindfuryProcSound/Addon.lua"))("WindfuryProcSound", runtime)
+local re=runtime.frame.scripts.OnEvent
+re(runtime.frame,"ADDON_LOADED","WindfuryProcSound")
+check(runtime.isShaman and runtime.frame.registered.SPELL_UPDATE_COOLDOWN, "weapon cooldown listener active on shaman")
+local startPlayed=#played
+clock=1000
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+clock=1002
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",16257,nil,nil,nil,nil)
+check(#played==startPlayed+2 and runtime.detector.count==2, "isolated two-proc weapon trace plays exactly twice")
+check(played[#played][1]:find("lightsabercrit_proc.ogg",1,true) and played[#played][2]=="Master", "cooldown uses saved selected sound and channel")
+local unpackArgs=table.unpack or unpack
+local rejected={
+ {}, {439440}, {439440,nil,nil,0}, {439440,nil,0,nil},
+ {439440,nil,0,133}, {439440,nil,2619,0}, {439440,439440,0,0},
+ {439440,nil,0,0,1}, {439441,nil,0,0}, {8516,nil,0,0},
+ {8512,nil,0,0}, {8232,nil,0,0}, {439440,nil,"0",0},
+}
+for i,args in ipairs(rejected) do
+ local prior=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",unpackArgs(args,1,5))
+ check(runtime.detector.count==prior,"reject nonmatching cooldown payload "..i)
+end
+for i=1,5 do
+ local args={439440,nil,0,0,nil};args[i]=secret
+ local prior=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",unpackArgs(args,1,5))
+ check(runtime.detector.count==prior,"secret cooldown field fails closed "..i)
+end
+runtime.db.weapon=false
+local prior=runtime.detector.count
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(runtime.detector.count==prior,"weapon option disables cooldown cue")
+runtime.db.weapon=true;runtime.db.enabled=false
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(runtime.detector.count==prior,"global disable suppresses cooldown cue")
+runtime.db.enabled=true
+clock=1100
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","legacy-same-proc",8233)
+check(runtime.detector.count==prior+1,"cooldown and legacy weapon ID deduplicate across sources")
+clock=1200
+re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","cast-first",8236)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(runtime.detector.count==prior+2,"legacy cast before cooldown also deduplicates")
+SlashCmdList.WINDFURYPROCSOUND("trace on")
+SlashCmdList.WINDFURYPROCSOUND("trace stop")
+check(runtime.frame.registered.SPELL_UPDATE_COOLDOWN,"stopping trace preserves automatic weapon listener")
+UnitClass=function() return "Warrior","WARRIOR" end
+re(runtime.frame,"PLAYER_ENTERING_WORLD")
+prior=runtime.detector.count
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(not runtime.isShaman and runtime.detector.count==prior,"weapon signature disabled on non-shaman")
+UnitClass=function() return "Secret",secret end
+re(runtime.frame,"PLAYER_ENTERING_WORLD")
+check(not runtime.isShaman,"restricted player class fails closed")
+
+-- Replay the isolated live Totem trace independently of Weapon and class.
+UnitClass=function() return "Shaman","SHAMAN" end
+re(runtime.frame,"PLAYER_ENTERING_WORLD")
+clock=1300;startPlayed=#played
+local oldWeapon,oldTotem=runtime.detector.weapon,runtime.detector.totem
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+clock=1302
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",16257,nil,nil,nil,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",16257,nil,nil,nil,nil)
+check(#played==startPlayed+2 and runtime.detector.totem==oldTotem+2,"isolated two-proc Totem trace plays exactly twice")
+check(runtime.detector.weapon==oldWeapon,"Totem signature is counted separately from Weapon")
+local totemRejected={
+ {8516,nil,0,0}, {8516,nil,2619,nil}, {8516,nil,2619,133}, {8516,nil,2619,0,1},
+ {8516,8516,2619,0}, {8512,nil,2619,0}, {10613,nil,2619,0}, {10614,nil,2619,0},
+ {8515,nil,2619,0}, {10609,nil,2619,0}, {10612,nil,2619,0},
+}
+for i,args in ipairs(totemRejected) do
+ prior=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",unpackArgs(args,1,5))
+ check(runtime.detector.count==prior,"reject non-proc Totem payload "..i)
+end
+for i=1,5 do
+ local args={8516,nil,2619,0,nil};args[i]=secret;prior=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",unpackArgs(args,1,5))
+ check(runtime.detector.count==prior,"Totem secret field fails closed "..i)
+end
+runtime.db.totem=false;prior=runtime.detector.count
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+check(runtime.detector.count==prior,"Totem option disables only Totem signature")
+clock=1400;re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(runtime.detector.count==prior+1,"Weapon stays enabled when Totem disabled")
+runtime.db.totem=true;runtime.db.weapon=false;prior=runtime.detector.count
+clock=1500;re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+check(runtime.detector.count==prior+1,"Totem stays enabled when Weapon disabled")
+re(runtime.frame,"UNIT_AURA","player",{addedAuras={{spellId=8516,auraInstanceID=909}}})
+check(runtime.detector.count==prior+1,"Totem cooldown and legacy aura deduplicate")
+UnitClass=function() return "Warrior","WARRIOR" end
+re(runtime.frame,"PLAYER_ENTERING_WORLD");prior=runtime.detector.count
+clock=1600;re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+check(runtime.detector.count==prior+1,"Totem own-client signature available to non-shaman recipient")
+for i,id in ipairs({10608,10610}) do
+ clock=1700+i;prior=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,2619,0,nil)
+ check(runtime.detector.count==prior+1,"higher Totem rank mapping "..id)
+end
+runtime.db.enabled=false;prior=runtime.detector.count
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+check(runtime.detector.count==prior,"global disable suppresses Totem")
+print("PASS: " .. tests .. " assertions. Isolated live traces replayed with mocked APIs; live audio playback is still unverified.")

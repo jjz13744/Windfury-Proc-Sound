@@ -5,7 +5,7 @@ ns.Core = Core
 -- Proc spells, NOT the casts that apply the weapon imbue or place the totem.
 -- Sourced from GaleCount; actual Forever event delivery is unverified. See SOURCES.md.
 Core.procIDs = {
-    [8233] = "weapon", [8236] = "weapon", [10484] = "weapon", [16361] = "weapon",
+    [439440] = "weapon", [8233] = "weapon", [8236] = "weapon", [10484] = "weapon", [16361] = "weapon",
     [8516] = "totem", [10608] = "totem", [10610] = "totem",
 }
 Core.defaults = { enabled = true, weapon = true, totem = true, sound = "lightsaber", channel = "Master" }
@@ -28,8 +28,20 @@ function Core.Settings(saved, catalog)
     return out
 end
 
+-- Exact public event signature observed during a confirmed own proc. Do not
+-- treat general refreshes, GCD/item updates, or a nearby spell ID as a proc.
+function Core.MatchCooldown(spellID, baseSpellID, category, recovery, itemID)
+    if Core.IsSecret(spellID) or Core.IsSecret(baseSpellID) or Core.IsSecret(category)
+        or Core.IsSecret(recovery) or Core.IsSecret(itemID) then return false, true end
+    if baseSpellID ~= nil or recovery ~= 0 or itemID ~= nil then return nil, false end
+    if spellID == 439440 and category == 0 then return "weapon", false end
+    -- Rank 1 was observed independently; higher ranks share the proc family.
+    if (spellID == 8516 or spellID == 10608 or spellID == 10610) and category == 2619 then return "totem", false end
+    return nil, false
+end
+
 function Core.NewDetector(emit)
-    local self = { events = {}, count = 0, restricted = 0, readable = 0 }
+    local self = { events = {}, count = 0, weapon = 0, totem = 0, restricted = 0, readable = 0 }
     function self:Observe(spellID, source, token, now, settings)
         if Core.IsSecret(spellID) then self.restricted = self.restricted + 1; return false end
         if type(spellID) ~= "number" then return false end
@@ -40,8 +52,10 @@ function Core.NewDetector(emit)
         -- Never inspect or stringify a secret cast GUID / aura instance ID.
         if Core.IsSecret(token) then token = nil end
         if type(token) ~= "string" and type(token) ~= "number" then token = nil end
-        local records = self.events[spellID] or {}
-        self.events[spellID] = records
+        -- A current cooldown signal and legacy cast/aura ID can describe the
+        -- same weapon proc. Match across sources by kind, not spell rank.
+        local records = self.events[kind] or {}
+        self.events[kind] = records
         -- Only match the same proc across two event sources. Distinct rapid casts
         -- from the same source remain distinct, unlike a blanket audio throttle.
         for i = #records, 1, -1 do
@@ -61,11 +75,12 @@ function Core.NewDetector(emit)
         end
         records[#records + 1] = { time = now, sources = { [source] = true }, tokens = { [source] = token } }
         self.count = self.count + 1
+        self[kind] = self[kind] + 1
         emit(spellID, kind)
         return true
     end
     function self:Reset()
-        self.events = {}; self.count = 0; self.restricted = 0; self.readable = 0
+        self.events = {}; self.count = 0; self.weapon = 0; self.totem = 0; self.restricted = 0; self.readable = 0
     end
     return self
 end
