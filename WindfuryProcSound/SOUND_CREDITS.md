@@ -1,7 +1,7 @@
 Bundled Audio Credits and Provenance
 ====================================
 Updated 2026-11-15. Nineteen custom cues are mono Vorbis at 44,100 Hz.
-One unchanged stereo source file comes from LightsaberCrit. Version 0.3.0
+One stereo source file comes from LightsaberCrit. Version 0.3.0
 uses native game audio for the Warcraft wolf and bundles quieter variants
 of the remaining 20 custom cues.
 The original audio set has public-domain / CC0 / original provenance.
@@ -67,18 +67,20 @@ for public redistribution. No match to a Wago sound is claimed.
 See sound-catalog.json for per-file source links, modifications, durations, hashes
 and technical measurements. Attribution is included voluntarily for CC0.
 No creator endorsement is implied. The 19 normalized custom cues peak below -4 dBFS.
-The unchanged LightsaberCrit clip peaks around -3 dBFS and is louder
-(mean approximately -11.7 dBFS). The selected sounds have been decoded and checked for valid
+The trimmed LightsaberCrit clip peaks around -2.9 dBFS and is louder
+(mean approximately -10.0 dBFS after removing silent time). The selected sounds have been decoded and checked for valid
 format, non-silent signal, duration and clipping; they have not been tested
 inside the World of Warcraft client.
 
 5. LightsaberCrit proc (lightsabercrit_proc.ogg), added at owner request
    Upstream project: 4rgs / LightsaberCrit.
    https://github.com/4rgs/LightsaberCrit/blob/main/sounds/lightsaber_proc.ogg
-   Original filename: sounds/lightsaber_proc.ogg. Bytes unchanged.
+   Original filename: sounds/lightsaber_proc.ogg. Version 0.3.1 trims its leading near-silence.
    Git blob SHA: c3b03bc95c112d20ba39064f1b8a2ae77ad79f7d
-   SHA256: 659c6e8715612ce38ad44323a53755bff5d059def2fa2d99d9befb9aa260e71c
-   25,067 bytes; 1.476463 seconds; stereo Vorbis; 44,100 Hz.
+   Upstream SHA256: 659c6e8715612ce38ad44323a53755bff5d059def2fa2d99d9befb9aa260e71c
+   Trimmed SHA256: f3621d16aac3429d0ea62c5291ea81bb2cfebadb1ee62a4e23debafc3d647b55
+   Removed 459.819 ms from the beginning, preserving a short pre-roll and tail.
+   Current file: 49,708 bytes; 1.016644 seconds; stereo Vorbis; 44,100 Hz.
    Project license listing: https://www.curseforge.com/wow/addons/lightsabercrit/license
    CurseForge labels the project MIT and displays a generic license template.
    No LICENSE file was returned by GitHub's license endpoint, and the sounds
@@ -93,6 +95,15 @@ Volume variants (version 0.3.0)
    Each custom cue has nine derived variants under sounds/volume_10 through
    sounds/volume_90. PCM amplitude is scaled directly from the original by
    0.1 through 0.9, without normalization or amplification, then re-encoded.
-   The 100% files remain byte-identical. The variants retain the original
+   The 100% files are the full-level custom sources. The variants retain the original
    asset's rights status. See volume_manifest.json and tools/prepare_volume.py.
    Native Warcraft Wolf Howl instead uses the game's SoundKit volume override.
+
+Leading-silence cleanup (version 0.3.1)
+   Fourteen custom cues had measurable near-silent lead-ins removed. Six
+   already-prompt cues remain byte-identical. A -60 dBFS peak threshold across
+   channels and at least 5 ms of pre-roll preserve the natural attack; no tail
+   is trimmed. No normalization, gain adjustment, fade or resampling is added.
+   Changed originals are re-encoded at Vorbis quality 10; quieter variants are
+   rebuilt. See sound-catalog.json for per-file trim amounts and source hashes.
+   The native Warcraft wolf sound cannot be edited by this addon.

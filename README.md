@@ -2,7 +2,7 @@
 
 A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes the native Warcraft wolf howl, chicken, and an original sci-fi blade cue.
 
-**Version 0.3.0:** addon-only volume, separate Weapon/Totem sounds, playback options, and native Warcraft wolf audio. The proc filters are unchanged from 0.2.2, which matched isolated live traces. New audio/UI behavior still needs in-game verification.
+**Version 0.3.1:** trimmed custom-sound lead-ins, addon-only volume, separate Weapon/Totem sounds, playback options, and native Warcraft wolf audio. The proc filters are unchanged from 0.2.2, which matched isolated live traces. New audio/UI behavior still needs in-game verification.
 
 ## Install on Windows
 
@@ -38,7 +38,7 @@ Open `/wfps`, or **Settings → AddOns → Windfury Proc Sound → Open sound op
 - **Preview when selecting:** off by default.
 - **Stop current sound**, **Reset counters** (keeps options), and **Restore defaults**.
 
-The addon never changes global volume CVars. Custom sounds use pre-rendered quieter files, with unchanged originals at 100%; native Warcraft audio uses its per-sound SoundKit volume override. Missing quiet files never fall back to full volume. Only one addon cue plays at a time.
+The addon never changes global volume CVars. Custom sounds use pre-rendered quieter files, with the full-level custom files at 100%; native Warcraft audio uses its per-sound SoundKit volume override. Missing quiet files never fall back to full volume. Only one addon cue plays at a time.
 
 Commands:
 
@@ -56,6 +56,10 @@ Commands:
 | `/wfps reset` | Restore defaults and clear counters |
 | `/wfps trace on` / `/wfps trace show` | Start / stop and show a short diagnostic trace |
 | `/wfps trace stop` / `/wfps trace clear` | Stop / remove the trace |
+
+## Quicker sound starts
+
+Version 0.3.1 removes 459.8 ms of near-silence from LightsaberCrit proc and 6.1–18.3 ms from 13 other custom clips. Six clips already started promptly and were left byte-identical. At least 5 ms before the audible attack is retained to avoid abrupt starts; tails and levels are preserved. All quieter volume copies are rebuilt from these sources. The native Warcraft wolf plays from game data and cannot be trimmed by the addon.
 
 ## Proc detection
 
@@ -95,7 +99,7 @@ The bundled sci-fi blade is an **original synthesized sound**, not the exact aud
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.0.zip`.
+- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.1.zip`.
 - Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
 - `python3 tools/prepare_volume.py --verify-only` verifies all 180 quieter custom-file variants and their hashes, amplitude, duration and decoding.
 

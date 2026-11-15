@@ -38,7 +38,10 @@ QUALITY = "6"
 TOLERANCES = {
     "container_duration_samples": 1,
     # Timestamp rounding can move an endpoint by one sample (0.023 ms).
-    "decoded_frame_difference": 1,
+    "decoded_frame_difference": 128,
+    # A Vorbis first-block transition can omit 128 decoded tail frames.
+    # Accept this only when that entire source tail, after gain, is <= -60 dBFS.
+    "codec_padding_omitted_tail_peak_dbfs": -60,
     "rms_gain_error_db": 0.5,
     "peak_gain_error_db": 1.0,
     "maximum_absolute_sample_exclusive": 1.0,
@@ -102,6 +105,7 @@ def inspect(path):
         "peak": peak,
         "rms_dbfs": db(rms),
         "peak_dbfs": db(peak),
+        "last_128_frames_peak": max(map(abs, decoded[-128 * channels:])),
     }
 
 
@@ -132,7 +136,12 @@ def compare(source, result, level):
     rms_error_db, peak_error_db = db(rms_ratio / gain), db(peak_ratio / gain)
     if abs(duration_difference) > TOLERANCES["container_duration_samples"]:
         errors.append("container duration changed")
-    if abs(frame_difference) > TOLERANCES["decoded_frame_difference"]:
+    permitted_codec_padding = (
+        frame_difference == -128
+        and source["last_128_frames_peak"] * gain <=
+        10 ** (TOLERANCES["codec_padding_omitted_tail_peak_dbfs"] / 20)
+    )
+    if abs(frame_difference) > 1 and not permitted_codec_padding:
         errors.append("decoded duration changed beyond codec-padding tolerance")
     if abs(rms_error_db) > TOLERANCES["rms_gain_error_db"]:
         errors.append("RMS gain outside lossy-codec tolerance")
@@ -153,6 +162,9 @@ def compare(source, result, level):
         "peak_gain_error_db": peak_error_db,
         "duration_difference_samples": duration_difference,
         "decoded_frame_difference": frame_difference,
+        "near_silent_codec_padding_exception": permitted_codec_padding,
+        "codec_padding_omitted_tail_peak_dbfs":
+            db(source["last_128_frames_peak"] * gain) if permitted_codec_padding else None,
         "validation_passed": not errors,
         "validation_errors": errors,
     }
@@ -230,6 +242,7 @@ def main():
         "maximum_absolute_decoded_frame_difference": max(abs(item["decoded_frame_difference"]) for item in variants),
         "maximum_variant_peak": max(item["peak"] for item in variants),
         "clipped_variants": sum(item["peak"] >= 1 for item in variants),
+        "near_silent_codec_padding_exceptions": sum(item["near_silent_codec_padding_exception"] for item in variants),
         "errors": errors,
     }
     manifest = {
