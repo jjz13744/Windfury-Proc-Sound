@@ -437,5 +437,26 @@
     "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
     "changes": "Mono conversion, near-silence trimming, level adjustment, edge fades, Vorbis encoding.",
     "file": "double_zap.ogg"
+  },
+  {
+    "id": "lightsabercrit_proc",
+    "name": "LightsaberCrit proc",
+    "filename": "lightsabercrit_proc.ogg",
+    "file": "lightsabercrit_proc.ogg",
+    "duration": 1.476463,
+    "sample_rate": 44100,
+    "channels": 2,
+    "codec": "Vorbis",
+    "peak_dbfs": -3.0,
+    "rms_dbfs": -11.7,
+    "bytes": 25067,
+    "sha256": "659c6e8715612ce38ad44323a53755bff5d059def2fa2d99d9befb9aa260e71c",
+    "author": "4rgs / LightsaberCrit project; original audio creator not identified",
+    "original_title": "lightsaber_proc.ogg",
+    "source_url": "https://github.com/4rgs/LightsaberCrit/blob/main/sounds/lightsaber_proc.ogg",
+    "source_blob_sha": "c3b03bc95c112d20ba39064f1b8a2ae77ad79f7d",
+    "license": "Project listed MIT on CurseForge; underlying audio rights and file-specific license unverified",
+    "license_url": "https://www.curseforge.com/wow/addons/lightsabercrit/license",
+    "changes": "None. Exact upstream OGG bytes, renamed locally only. Included at owner request after rights uncertainty was disclosed; audio-specific redistribution rights remain unverified."
   }
 ]

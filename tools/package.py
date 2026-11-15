@@ -5,7 +5,7 @@ import hashlib
 import re
 import zipfile
 root = Path(__file__).resolve().parents[1]
-addon = root / 'WindfurySaber'
+addon = root / 'WindfuryProcSound'
 for toc in addon.glob('*.toc'):
     lines = toc.read_text().splitlines()
     assert '## Interface: 16001' in lines
@@ -13,14 +13,14 @@ for toc in addon.glob('*.toc'):
         if line and not line.startswith('#'):
             assert (addon / line).is_file(), f'Missing {line}'
 audio = list((addon / 'sounds').glob('*.ogg'))
-assert len(audio) == 20, f'Expected 20 OGGs, got {len(audio)}'
+assert len(audio) == 21, f'Expected 21 OGGs, got {len(audio)}'
 for file in audio:
     assert file.read_bytes().startswith(b'OggS'), file
-assert len(re.findall(r'id\s*=', (addon / 'Sounds.lua').read_text())) == 20
+assert len(re.findall(r'id\s*=', (addon / 'Sounds.lua').read_text())) == 21
 assert (addon / 'SOUND_CREDITS.md').is_file()
 for name in ['README.md', 'LICENSE']:
     (addon / name).write_bytes((root / name).read_bytes())
-out = root / 'dist' / 'WindfurySaber-0.1.0.zip'
+out = root / 'dist' / 'WindfuryProcSound-0.2.0.zip'
 out.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for file in sorted(addon.rglob('*')):

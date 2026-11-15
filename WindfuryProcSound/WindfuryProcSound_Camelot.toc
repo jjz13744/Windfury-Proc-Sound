@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Windfury Proc Sound
+## Notes: Twenty-one selectable sound cues for readable player Windfury proc events in WoW Forever.
+## Author: Jared Zengo
+## Version: 0.2.0
+## SavedVariables: WindfuryProcSoundDB, WindfurySaberDB
+## OptionalDeps: WindfurySaber
+## X-Category: Audio & Video
+## X-Compatibility: WoW Forever; live proc validation pending
+Sounds.lua
+Core.lua
+Addon.lua
+Options.lua

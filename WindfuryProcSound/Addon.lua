@@ -9,7 +9,7 @@ ns.registered = {}
 ns.soundFailures = 0
 
 function ns.Print(message)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff70caffWindfury Saber:|r " .. message)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff70caffWindfury Proc Sound:|r " .. message)
 end
 
 function ns.GetSound(id)
@@ -31,7 +31,7 @@ function ns.Play(id, preview)
     end
     ns.soundFailures = ns.soundFailures + 1
     if preview or not unavailableWarned then
-        ns.Print("Sound could not play. Check the sounds folder and game audio settings; use /wfs test.")
+        ns.Print("Sound could not play. Check the sounds folder and game audio settings; use /wfps test.")
         unavailableWarned = true
     end
     return false
@@ -40,6 +40,7 @@ end
 ns.detector = Core.NewDetector(function() ns.Play() end)
 
 local function observe(spellID, source, token)
+    if ns.legacyActive then return end
     ns.detector:Observe(spellID, source, token, GetTime(), ns.db)
 end
 
@@ -70,8 +71,16 @@ local function registerUnit(event)
     ns.registered[event] = ok and result ~= false
 end
 
+local function legacyLoaded()
+    local check = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+    if type(check) ~= "function" then return false end
+    local ok, loaded = pcall(check, "WindfurySaber")
+    return ok and loaded == true
+end
+
 function ns.Status()
     local d = ns.detector
+    if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
     ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.GetSound(ns.db.sound).name .. "; " .. ns.db.channel .. " channel.")
     ns.Print("This session: " .. d.count .. " detected procs, " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures.")
     ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ". Live Forever validation is still needed.")
@@ -81,8 +90,12 @@ frame:SetScript("OnEvent", function(_, event, ...)
     if event == "ADDON_LOADED" then
         local name = ...
         if name ~= ADDON then return end
-        ns.db = Core.Settings(WindfurySaberDB, ns.sounds)
-        WindfurySaberDB = ns.db
+        local migrating = type(WindfuryProcSoundDB) ~= "table" and type(WindfurySaberDB) == "table"
+        ns.db = Core.Settings(migrating and WindfurySaberDB or WindfuryProcSoundDB, ns.sounds)
+        WindfuryProcSoundDB = ns.db
+        ns.legacyActive = legacyLoaded()
+        if migrating then ns.Print("Previous options imported into Windfury Proc Sound.") end
+        if ns.legacyActive then ns.Print("Disable the old addon in the AddOns menu, then reload. New automatic cues are paused to avoid doubles.") end
         ready = true
         registerUnit("UNIT_SPELLCAST_SUCCEEDED")
         registerUnit("UNIT_AURA")
@@ -103,9 +116,11 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 frame:RegisterEvent("ADDON_LOADED")
 
-SLASH_WINDFURYSABER1 = "/wfs"
-SLASH_WINDFURYSABER2 = "/windfurysaber"
-SlashCmdList.WINDFURYSABER = function(text)
+SLASH_WINDFURYPROCSOUND1 = "/wfps"
+SLASH_WINDFURYPROCSOUND2 = "/windfuryprocsound"
+SLASH_WINDFURYPROCSOUND3 = "/wfs"
+SLASH_WINDFURYPROCSOUND4 = "/windfurysaber" -- Legacy command alias.
+SlashCmdList.WINDFURYPROCSOUND = function(text)
     if not ready then return end
     local cmd, arg = (text or ""):match("^%s*(%S*)%s*(.-)%s*$")
     cmd = cmd:lower()
@@ -120,12 +135,12 @@ SlashCmdList.WINDFURYSABER = function(text)
             if arg == sound.id or tonumber(arg) == i then found = sound end
         end
         if found then ns.db.sound = found.id; ns.Play(nil, true); if ns.RefreshOptions then ns.RefreshOptions() end
-        else ns.Print("Use /wfs to choose one of the 20 sounds, or /wfs sound NUMBER (1-20).") end
+        else ns.Print("Use /wfps to choose one of the " .. #ns.sounds .. " sounds, or /wfps sound NUMBER (1-" .. #ns.sounds .. ").") end
     elseif cmd == "reset" then
-        ns.db = Core.Settings({}, ns.sounds); WindfurySaberDB = ns.db; ns.detector:Reset()
+        ns.db = Core.Settings({}, ns.sounds); WindfuryProcSoundDB = ns.db; ns.detector:Reset()
         ns.soundFailures = 0; unavailableWarned = false
         if ns.RefreshOptions then ns.RefreshOptions() end
         ns.Print("Options and session counters reset.")
     elseif cmd == "" or cmd == "options" then ns.ShowOptions()
-    else ns.Print("/wfs options, test, sound 1-20, status, on, off, reset") end
+    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", status, on, off, reset") end
 end

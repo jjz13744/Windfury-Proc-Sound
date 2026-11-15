@@ -36,8 +36,10 @@ function ns.RefreshOptions()
 end
 
 local function makeWindow()
-    window = CreateFrame("Frame", "WindfurySaberOptions", UIParent, "BackdropTemplate")
-    window:SetSize(600, 570); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
+    window = CreateFrame("Frame", "WindfuryProcSoundOptions", UIParent, "BackdropTemplate")
+    local rows = math.ceil(#ns.sounds / 2)
+    local extraHeight = math.max(0, rows - 10) * 31
+    window:SetSize(600, 570 + extraHeight); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
     window:SetClampedToScreen(true); window:EnableMouse(true); window:SetMovable(true)
     window:RegisterForDrag("LeftButton")
     window:SetScript("OnDragStart", function(self) self:StartMoving() end)
@@ -46,7 +48,7 @@ local function makeWindow()
     local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -4, -4)
     close:SetScript("OnClick", function() window:Hide() end)
-    label(window, "Windfury Saber", 22, -22, "GameFontNormalLarge")
+    label(window, "Windfury Proc Sound", 22, -22, "GameFontNormalLarge")
     label(window, "Choose a cue, then Preview. Changes save automatically.", 22, -48, "GameFontHighlightSmall")
     enable = check(window, "Enable", 18, -67, "enabled")
     weapon = check(window, "Windfury Weapon", 150, -67, "weapon")
@@ -57,20 +59,20 @@ local function makeWindow()
     button(window, "Preview selected", 150, 420, -105, function() ns.Play(nil, true) end)
     for i, sound in ipairs(ns.sounds) do
         local choice = sound
-        local col = i > 10 and 1 or 0
-        local row = (i - 1) % 10
+        local col = math.floor((i - 1) / rows)
+        local row = (i - 1) % rows
         local x, y = 22 + col * 284, -148 - row * 31
         choices[choice.id] = button(window, choice.name, 197, x, y, function()
             ns.db.sound = choice.id; ns.RefreshOptions()
         end)
         button(window, "Play", 62, x + 202, y, function() ns.Play(choice.id, true) end)
     end
-    summary = label(window, "", 24, -468, "GameFontHighlight")
-    label(window, "Proc detection uses readable player events only. Restricted events are skipped.", 24, -493, "GameFontHighlightSmall")
-    label(window, "Use /wfs status for diagnostics. In-game Forever verification is still required.", 24, -510, "GameFontHighlightSmall")
-    button(window, "Diagnostics", 115, 24, -532, ns.Status)
-    button(window, "Close", 90, 480, -532, function() window:Hide() end)
-    UISpecialFrames[#UISpecialFrames + 1] = "WindfurySaberOptions"
+    summary = label(window, "", 24, -468 - extraHeight, "GameFontHighlight")
+    label(window, "Proc detection uses readable player events only. Restricted events are skipped.", 24, -493 - extraHeight, "GameFontHighlightSmall")
+    label(window, "Use /wfps status for diagnostics. In-game Forever verification is still required.", 24, -510 - extraHeight, "GameFontHighlightSmall")
+    button(window, "Diagnostics", 115, 24, -532 - extraHeight, ns.Status)
+    button(window, "Close", 90, 480, -532 - extraHeight, function() window:Hide() end)
+    UISpecialFrames[#UISpecialFrames + 1] = "WindfuryProcSoundOptions"
     window:SetScript("OnShow", ns.RefreshOptions)
     window:Hide()
 end
@@ -83,10 +85,10 @@ end
 function ns.RegisterSettings()
     if not Settings or not Settings.RegisterCanvasLayoutCategory or not Settings.RegisterAddOnCategory then return end
     local panel = CreateFrame("Frame")
-    panel.name = "Windfury Saber"
-    label(panel, "Windfury Saber", 18, -20, "GameFontNormalLarge")
-    label(panel, "Twenty selectable sound cues for player Windfury procs.", 18, -50, "GameFontHighlight")
+    panel.name = "Windfury Proc Sound"
+    label(panel, "Windfury Proc Sound", 18, -20, "GameFontNormalLarge")
+    label(panel, tostring(#ns.sounds) .. " selectable sound cues for player Windfury procs.", 18, -50, "GameFontHighlight")
     button(panel, "Open sound options", 180, 18, -82, ns.ShowOptions)
-    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, panel, "Windfury Saber")
+    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, panel, "Windfury Proc Sound")
     if ok and category then pcall(Settings.RegisterAddOnCategory, category) end
 end

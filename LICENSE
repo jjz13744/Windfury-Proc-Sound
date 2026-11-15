@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Windfury Saber contributors
+Copyright (c) 2026 Windfury Proc Sound contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,5 +20,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This license covers the original addon code. Bundled audio has separate
-CC0/public-domain provenance; see WindfurySaber/SOUND_CREDITS.md.
+This license covers the original addon code. Bundled audio is not licensed by this document. The original 20 sounds have
+original/CC0/public-domain provenance. The added LightsaberCrit proc audio
+has unverified underlying rights; see WindfuryProcSound/SOUND_CREDITS.md.

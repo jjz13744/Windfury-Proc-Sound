@@ -20,4 +20,5 @@ ns.sounds = {
     { id = "three_tone", name = "Three-Tone Chime", file = "three_tone.ogg" },
     { id = "electric_zap", name = "Electric Zap", file = "electric_zap.ogg" },
     { id = "double_zap", name = "Double Zap", file = "double_zap.ogg" },
+    { id = "lightsabercrit_proc", name = "LightsaberCrit proc", file = "lightsabercrit_proc.ogg" },
 }

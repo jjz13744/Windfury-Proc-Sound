@@ -1,9 +1,11 @@
 Bundled Audio Credits and Provenance
 ====================================
-Verified 2026-11-14. All 20 files are mono Ogg Vorbis at 44,100 Hz.
-Third-party assets retain their original public-domain / CC0 status,
-not the addon source-code license. No movie, commercial game or Wago clip is
-included, and this pack is not claimed to match any particular Wago sound.
+Verified 2026-11-14. The original 20 files are mono Ogg Vorbis at 44,100 Hz.
+Version 0.2.0 adds one unchanged stereo Ogg file from LightsaberCrit.
+The original audio set has public-domain / CC0 / original provenance.
+The added LightsaberCrit file has unverified underlying audio rights;
+it is not covered by this addon's code license and is not cleared here
+for public redistribution. No match to a Wago sound is claimed.
 
 1. Wolf Howl (wolf_howl.ogg)
    Original: "Wolf howls" by the U.S. Fish and Wildlife Service.
@@ -33,7 +35,7 @@ included, and this pack is not claimed to match any particular Wago sound.
    from a film, game, commercial sound library or Wago aura.
    Reproducible source: tools/prepare_audio.py.
 
-4. The remaining 17 files
+4. Seventeen Kenney effects
    Kenney Vleugels (Kenney.nl), "63 Digital sound effects (lasers, phasers,
    space etc.)", originally made with a KORG microKORG synthesizer.
    https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc
@@ -60,9 +62,27 @@ included, and this pack is not claimed to match any particular Wago sound.
    electric_zap.ogg <- zap1.mp3
    double_zap.ogg <- zapTwoTone.mp3
 
-See catalog.json for per-file source links, modifications, durations, hashes
+See sound-catalog.json for per-file source links, modifications, durations, hashes
 and technical measurements. Attribution is included voluntarily for CC0.
-No creator endorsement is implied. Peak levels remain below -4 dBFS after
-Vorbis decoding. The selected sounds have been decoded and checked for valid
+No creator endorsement is implied. The original 20 normalized cues peak below -4 dBFS.
+The unchanged LightsaberCrit clip peaks around -3 dBFS and is louder
+(mean approximately -11.7 dBFS). The selected sounds have been decoded and checked for valid
 format, non-silent signal, duration and clipping; they have not been tested
 inside the World of Warcraft client.
+
+5. LightsaberCrit proc (lightsabercrit_proc.ogg), added at owner request
+   Upstream project: 4rgs / LightsaberCrit.
+   https://github.com/4rgs/LightsaberCrit/blob/main/sounds/lightsaber_proc.ogg
+   Original filename: sounds/lightsaber_proc.ogg. Bytes unchanged.
+   Git blob SHA: c3b03bc95c112d20ba39064f1b8a2ae77ad79f7d
+   SHA256: 659c6e8715612ce38ad44323a53755bff5d059def2fa2d99d9befb9aa260e71c
+   25,067 bytes; 1.476463 seconds; stereo Vorbis; 44,100 Hz.
+   Project license listing: https://www.curseforge.com/wow/addons/lightsabercrit/license
+   CurseForge labels the project MIT and displays a generic license template.
+   No LICENSE file was returned by GitHub's license endpoint, and the sounds
+   directory has no separate attribution or license file. No original audio
+   creator or file-specific rights statement was located. These observations
+   do not establish whether the project author owns the recording or whether
+   its underlying audio is licensed for redistribution.
+   Do not assume the project's MIT label clears the audio. Confirm permission
+   from its rights holder, or remove this file before public distribution.
