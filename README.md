@@ -64,8 +64,6 @@ No WeakAuras, GaleCount, or other addon is required. No hidden combat data is ex
 
 The bundled sci-fi blade is an **original synthesized sound**, not the exact audio from the linked Wago aura or a Star Wars recording. Wolf and chicken are real recordings. Other effects come from the creator's CC0 sound pack. The separately requested LightsaberCrit proc file is not part of that CC0/original set and is louder than the normalized cues. See `WindfuryProcSound/SOUND_CREDITS.md` for the complete asset list, source URLs, licenses, and processing notes.
 
-The original request referenced <https://wago.io/wqR5gKz0o>. That page could not be read during development, so its code or exact audio is not included. At the owner's request, version 0.2.0 adds the exact LightsaberCrit proc OGG as a separate **LightsaberCrit proc** option (#21). Select it with `/wfps sound 21`, or choose it in `/wfps`. Its source project lists MIT on CurseForge, but no file-specific rights statement or original audio attribution was found, so coverage of the audio itself is **unverified**. The owner requested its inclusion after this uncertainty was disclosed. Publication does not establish audio rights; obtain permission from the rights holder before relying on redistribution rights. The original sci-fi blade remains the default.
-
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
