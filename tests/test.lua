@@ -49,11 +49,15 @@ local function widget()
     function f:SetPoint(...) self.point = {...} end
     function f:SetSize(w,h) self.width=w; self.height=h end
     function f:SetChecked(v) self.checked = v end
+    function f:SetValue(v) self.value=v; if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self,v) end end
+    function f:GetValue() return self.value end
+    function f:SetMinMaxValues(low,high) self.low=low;self.high=high end
+    function f:SetValueStep(v) self.step=v end
     function f:GetChecked() return self.checked end
     function f:Show() self.shown=true; if self.scripts.OnShow then self.scripts.OnShow(self) end end
     function f:Hide() self.shown=false end
     local noOp = function() end
-    for _, n in ipairs({"SetFrameStrata", "SetClampedToScreen", "EnableMouse", "SetMovable", "RegisterForDrag", "SetBackdrop", "SetEnabled", "StartMoving", "StopMovingOrSizing"}) do f[n] = noOp end
+    for _, n in ipairs({"SetOrientation", "SetObeyStepOnDrag", "SetThumbTexture", "SetFrameStrata", "SetClampedToScreen", "EnableMouse", "SetMovable", "RegisterForDrag", "SetBackdrop", "SetEnabled", "StartMoving", "StopMovingOrSizing"}) do f[n] = noOp end
     return f
 end
 CreateFrame = function(_, name)
@@ -64,6 +68,10 @@ end
 DEFAULT_CHAT_FRAME = {AddMessage=function(_, m) messages[#messages+1]=m end}
 PlaySoundFile=function(path, channel) played[#played+1]={path,channel}; return true,#played end
 StopSound=function() end
+C_Sound={PlaySound=function(kit,channel,duplicates,callback,priority,volume)
+    played[#played+1]={"soundkit:"..kit,channel,kit=kit,volume=volume}
+    return true,#played
+end}
 GetTime=function() return clock end
 SlashCmdList={}; UISpecialFrames={}; UIParent={}
 Settings={ RegisterCanvasLayoutCategory=function() return {} end, RegisterAddOnCategory=function() end }
@@ -72,8 +80,10 @@ check(#ns.sounds == 21, "21 sounds")
 local unique = {}
 for _, s in ipairs(ns.sounds) do
     check(not unique[s.id], "unique sound " .. s.id); unique[s.id] = true
-    local audio = assert(io.open("WindfuryProcSound/sounds/" .. s.file, "rb"))
-    check(audio:read(4)=="OggS", "valid OGG header " .. s.id); audio:close()
+    if s.file then
+        local audio = assert(io.open("WindfuryProcSound/sounds/" .. s.file, "rb"))
+        check(audio:read(4)=="OggS", "valid OGG header " .. s.id); audio:close()
+    else check(s.soundKit==1018 and s.fallbackSoundKit==53875, "Warcraft wolf uses native howl kits") end
 end
 assert(loadfile("WindfuryProcSound/Addon.lua"))("WindfuryProcSound", ns)
 assert(loadfile("WindfuryProcSound/Options.lua"))("WindfuryProcSound", ns)
@@ -103,7 +113,7 @@ SlashCmdList.WINDFURYPROCSOUND("test")
 check(#played==3, "manual preview works when disabled")
 SlashCmdList.WINDFURYPROCSOUND("options")
 check(WindfuryProcSoundOptions.shown, "options opens")
-check(WindfuryProcSoundOptions.height == 601, "21-sound window grows for extra row")
+check(WindfuryProcSoundOptions.height == 650, "tabbed options window fits all controls")
 local positions, selectable = {}, 0
 for _, f in ipairs(frames) do
     if f.width == 197 and f.point then
@@ -318,4 +328,125 @@ end
 runtime.db.enabled=false;prior=runtime.detector.count
 re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
 check(runtime.detector.count==prior,"global disable suppresses Totem")
-print("PASS: " .. tests .. " assertions. Isolated live traces replayed with mocked APIs; live audio playback is still unverified.")
+
+
+-- Volume and convenience settings preserve old selections and never touch CVars.
+local migrated=C.Settings({sound="wolf",volume=54,minGap=0.26,weaponSound="missing"},catalog)
+check(migrated.weaponSound=="wolf" and migrated.totemSound=="wolf","old sound migrated to both proc types")
+check(migrated.volume==50 and math.abs(migrated.minGap-0.3)<0.001,"volume and minimum gap snap to honest steps")
+local invalid=C.Settings({volume=0/0,minGap=math.huge},catalog)
+check(invalid.volume==100 and invalid.minGap==0,"invalid numeric settings reset safely")
+check(C.Snap(-30,0,100,10,100)==0 and C.Snap(999,0,100,10,100)==100,"volume bounds")
+check(C.SoundPath("WindfuryProcSound","x.ogg",0)==nil,"zero volume has no playback path")
+check(C.SoundPath("WindfuryProcSound","x.ogg",50)=="Interface\\AddOns\\WindfuryProcSound\\sounds\\volume_50\\x.ogg","quiet volume uses pre-rendered path")
+check(C.SoundPath("WindfuryProcSound","x.ogg",100)=="Interface\\AddOns\\WindfuryProcSound\\sounds\\x.ogg","100 percent uses untouched original")
+SetCVar=function() error("global audio setting must never be changed") end
+C_CVar={SetCVar=SetCVar}
+local stopped=0
+StopSound=function() stopped=stopped+1 end
+local ui={}
+WindfuryProcSoundDB={enabled=true,weapon=true,totem=true,sound="lightsabercrit_proc",channel="Master"}
+UnitClass=function() return "Shaman","SHAMAN" end
+assert(loadfile("WindfuryProcSound/Core.lua"))("WindfuryProcSound",ui)
+assert(loadfile("WindfuryProcSound/Sounds.lua"))("WindfuryProcSound",ui)
+assert(loadfile("WindfuryProcSound/Addon.lua"))("WindfuryProcSound",ui)
+assert(loadfile("WindfuryProcSound/Options.lua"))("WindfuryProcSound",ui)
+local ue=ui.frame.scripts.OnEvent
+ue(ui.frame,"ADDON_LOADED","WindfuryProcSound")
+check(ui.db.weaponSound=="lightsabercrit_proc" and ui.db.totemSound=="lightsabercrit_proc","existing actual selection preserved for both")
+ui.ShowOptions()
+check(WindfuryProcSoundSoundPanel.shown and not WindfuryProcSoundPlaybackPanel.shown,"Sounds tab selected initially")
+check(WindfuryProcSoundVolumeSlider.low==0 and WindfuryProcSoundVolumeSlider.high==100 and WindfuryProcSoundVolumeSlider.step==10,"volume slider range and step")
+WindfuryProcSoundVolumeSlider:SetValue(43)
+check(ui.db.volume==40 and WindfuryProcSoundVolumeSlider:GetValue()==40,"slider snaps and refreshes without recursion")
+local n=#played
+ui.Play(nil,true)
+check(#played==n+1 and played[#played][1]:find("volume_40\\lightsabercrit_proc.ogg",1,true),"preview respects own volume")
+ui.SetVolume(0);n=#played;local failures=ui.soundFailures
+check(stopped>0,"mute stops owned sound handle")
+ui.Play(nil,true)
+check(#played==n and ui.soundFailures==failures,"muted preview is silent without playback failure")
+ui.SetVolume(50)
+ui.SelectSound("chicken","weapon");ui.SelectSound("laser_pulse","totem")
+ui.Play(nil,true,"weapon");local weaponPath=played[#played][1]
+ui.Play(nil,true,"totem")
+check(weaponPath:find("volume_50\\chicken.ogg",1,true) and played[#played][1]:find("volume_50\\laser_pulse.ogg",1,true),"independent Weapon and Totem previews")
+SlashCmdList.WINDFURYPROCSOUND("sound weapon 21")
+check(ui.db.weaponSound=="lightsabercrit_proc" and ui.db.totemSound=="laser_pulse","weapon slash selection preserves totem")
+SlashCmdList.WINDFURYPROCSOUND("sound totem 3")
+check(ui.db.weaponSound=="lightsabercrit_proc" and ui.db.totemSound=="chicken","totem slash selection preserves weapon")
+SlashCmdList.WINDFURYPROCSOUND("sound 2")
+check(ui.db.weaponSound==ui.sounds[2].id and ui.db.totemSound==ui.sounds[2].id,"legacy sound command updates both")
+SlashCmdList.WINDFURYPROCSOUND("volume 76")
+check(ui.db.volume==80,"volume slash rounds to available variant")
+ui.db.volume=100;ui.db.minGap=1;ui.db.randomSound=false;ui.ResetCounters()
+n=#played;clock=2000
+ue(ui.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+clock=2000.5;ue(ui.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+ui.Play(nil,true,"totem")
+clock=2001;ue(ui.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(ui.detector.weapon==3 and ui.suppressed==1 and #played==n+3,"gap limits audio only; preview bypasses without changing automatic interval")
+ui.db.minGap=0;ui.db.randomSound=true;ui.ResetCounters()
+local previous
+for i=1,40 do
+ clock=2100+i;ui.Play(nil,false,"weapon")
+ local path=played[#played][1]
+ check(path~=previous,"random cues avoid immediate repeat "..i);previous=path
+end
+n=#played;ui.Play("chicken",true)
+check(#played==n+1 and played[#played][1]:find("chicken.ogg",1,true),"explicit preview ignores random mode")
+local beforeSettings=ui.db.weaponSound
+SlashCmdList.WINDFURYPROCSOUND("clearcounts")
+check(ui.detector.count==0 and ui.suppressed==0 and ui.db.weaponSound==beforeSettings,"counter reset preserves options")
+local beforeStop=stopped
+SlashCmdList.WINDFURYPROCSOUND("stop")
+check(stopped==beforeStop+1,"stop command only stops owned handle")
+ui.Play(nil,true);beforeStop=stopped
+SlashCmdList.WINDFURYPROCSOUND("off")
+check(stopped==beforeStop+1 and not ui.db.enabled,"disable stops current addon cue")
+-- Find the most recently created control by text to exercise actual callbacks.
+local function clickText(text)
+ for i=#frames,1,-1 do local f=frames[i];if f.textValue==text and f.scripts.OnClick then f.scripts.OnClick(f);return f end end
+ error("Missing UI button "..text)
+end
+clickText("Playback")
+check(WindfuryProcSoundPlaybackPanel.shown and not WindfuryProcSoundSoundPanel.shown,"Playback tab switches visibility")
+WindfuryProcSoundGapSlider:SetValue(0.26)
+check(math.abs(ui.db.minGap-0.3)<0.001,"gap slider snaps to 0.1 second")
+clickText("Sounds");clickText("Weapon")
+ui.db.previewOnSelect=false;n=#played
+clickText("Chicken")
+check(ui.db.weaponSound=="chicken" and #played==n,"sound selection is quiet by default")
+ui.db.previewOnSelect=true
+clickText("Laser Pulse")
+check(ui.db.weaponSound=="laser_pulse" and #played==n+1,"optional selection preview plays once")
+clickText("Close");ui.ShowOptions()
+check(WindfuryProcSoundOptions.shown,"options reopen after Close")
+ui.ResetOptions()
+check(ui.db.volume==100 and ui.db.minGap==0 and not ui.db.randomSound and not ui.db.previewOnSelect,"reset restores convenience defaults")
+check(ui.db.weaponSound=="lightsaber" and ui.db.totemSound=="lightsaber","reset restores both sounds")
+
+-- Native Warcraft howl: exact volume override, known same-wolf fallback, no redistribution.
+ui.SetVolume(40);ui.Play("wolf_howl",true)
+check(played[#played].kit==1018 and played[#played].volume==0.4,"native Warcraft howl uses own volume override")
+local normalKitPlay=C_Sound.PlaySound
+local attempts={}
+C_Sound.PlaySound=function(kit,channel,duplicates,callback,priority,volume)
+ attempts[#attempts+1]={kit,volume}
+ if kit==1018 then return false end
+ return normalKitPlay(kit,channel,duplicates,callback,priority,volume)
+end
+check(ui.Play("wolf_howl",true) and #attempts==2 and attempts[2][1]==53875 and attempts[2][2]==0.4,"unavailable classic howl falls back only to same Warcraft wolf kit")
+C_Sound.PlaySound=function() return false end
+failures=ui.soundFailures;n=#played
+check(not ui.Play("wolf_howl",true) and #played==n and ui.soundFailures==failures+1,"unavailable native kits report failure rather than substitute unrelated wolf")
+C_Sound.PlaySound=normalKitPlay
+local normalFilePlay=PlaySoundFile
+local attemptedPaths={}
+PlaySoundFile=function(path) attemptedPaths[#attemptedPaths+1]=path;return false end
+check(not ui.Play("chicken",true) and #attemptedPaths==1 and attemptedPaths[1]:find("volume_40\\chicken.ogg",1,true),"missing quiet file never falls back to original loudness")
+PlaySoundFile=normalFilePlay
+ui.SetVolume(0);n=#played
+check(ui.Play("wolf_howl",true) and #played==n,"zero volume also mutes native howl")
+ui.SetVolume(100)
+print("PASS: " .. tests .. " assertions. Mocked API/UI tests; native game audio and layout require live checks.")

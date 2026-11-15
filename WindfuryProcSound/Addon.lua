@@ -2,11 +2,14 @@ local ADDON, ns = ...
 local Core = ns.Core
 local frame = CreateFrame("Frame")
 local soundHandle
+local lastAutomaticPlay
+local lastRandomIndex
 local unavailableWarned = false
 local ready = false
 ns.frame = frame
 ns.registered = {}
 ns.soundFailures = 0
+ns.suppressed = 0
 
 function ns.Print(message)
     DEFAULT_CHAT_FRAME:AddMessage("|cff70caffWindfury Proc Sound:|r " .. message)
@@ -17,27 +20,95 @@ function ns.GetSound(id)
     return ns.sounds[1]
 end
 
-function ns.Play(id, preview)
-    local selected = ns.GetSound(id or ns.db.sound)
-    local path = "Interface\\AddOns\\" .. ADDON .. "\\sounds\\" .. selected.file
-    -- Keep only one cue playing. No CVars, game sound muting, or volume changes.
+function ns.StopPlayback()
     if soundHandle and type(StopSound) == "function" then pcall(StopSound, soundHandle, 50) end
     soundHandle = nil
-    local ok, willPlay, handle = pcall(PlaySoundFile, path, ns.db.channel)
+end
+
+function ns.SelectSound(id, kind)
+    local selected = ns.GetSound(id)
+    if kind == "weapon" or kind == "totem" then
+        ns.db[kind .. "Sound"] = selected.id
+    else
+        ns.db.sound = selected.id
+        ns.db.weaponSound = selected.id
+        ns.db.totemSound = selected.id
+    end
+    if ns.RefreshOptions then ns.RefreshOptions() end
+end
+
+function ns.SetVolume(value)
+    ns.db.volume = Core.Snap(value, 0, 100, 10, 100)
+    -- Muting stops only this addon's current cue. Other levels apply next play.
+    if ns.db.volume == 0 then ns.StopPlayback() end
+    if ns.RefreshOptions then ns.RefreshOptions() end
+end
+
+function ns.Play(id, preview, kind)
+    local now = GetTime()
+    if not preview and lastAutomaticPlay and now - lastAutomaticPlay < ns.db.minGap then
+        ns.suppressed = ns.suppressed + 1; return true
+    end
+    kind = kind == "totem" and "totem" or "weapon"
+    local selected = ns.GetSound(id or ns.db[kind .. "Sound"] or ns.db.sound)
+    if not preview and ns.db.randomSound then
+        local n = #ns.sounds
+        local index = math.random(lastRandomIndex and n > 1 and n - 1 or n)
+        if lastRandomIndex and n > 1 and index >= lastRandomIndex then index = index + 1 end
+        lastRandomIndex = index
+        selected = ns.sounds[index]
+    end
+    if ns.db.volume == 0 then
+        ns.StopPlayback()
+        if preview then ns.Print("Muted at 0%. Increase the addon volume to preview.")
+        else ns.suppressed = ns.suppressed + 1 end
+        return true
+    end
+    -- Custom cues use encoded gain; the native Warcraft howl uses SoundKit's
+    -- documented volume override. Neither changes global CVars or audio timers.
+    ns.StopPlayback()
+    local ok, willPlay, handle
+    if selected.soundKit then
+        local play = C_Sound and C_Sound.PlaySound or PlaySound
+        if type(play) == "function" then
+            ok, willPlay, handle = pcall(play, selected.soundKit, ns.db.channel, false, false, nil, ns.db.volume / 100)
+            if (not ok or not willPlay) and selected.fallbackSoundKit then
+                ok, willPlay, handle = pcall(play, selected.fallbackSoundKit, ns.db.channel, false, false, nil, ns.db.volume / 100)
+            end
+        end
+    else
+        local path = Core.SoundPath(ADDON, selected.file, ns.db.volume)
+        ok, willPlay, handle = pcall(PlaySoundFile, path, ns.db.channel)
+    end
     if ok and willPlay then
         soundHandle = handle
-        if preview then ns.Print("Preview: " .. selected.name) end
+        if preview then ns.Print("Preview: " .. selected.name .. " (" .. ns.db.volume .. "%)")
+        else lastAutomaticPlay = now end
         return true
     end
     ns.soundFailures = ns.soundFailures + 1
     if preview or not unavailableWarned then
-        ns.Print("Sound could not play. Check the sounds folder and game audio settings; use /wfps test.")
+        ns.Print("Sound could not play. Check the sound files or native sound kit and restart after updating. No fallback to a louder or different cue is used.")
         unavailableWarned = true
     end
     return false
 end
 
-ns.detector = Core.NewDetector(function() ns.Play() end)
+ns.detector = Core.NewDetector(function(_, kind) ns.Play(nil, false, kind) end)
+
+function ns.ResetCounters()
+    ns.detector:Reset()
+    ns.soundFailures = 0; ns.suppressed = 0; unavailableWarned = false
+    lastAutomaticPlay = nil
+end
+
+function ns.ResetOptions()
+    ns.StopPlayback(); ns.StopTrace(false); ns.trace = nil
+    ns.db = Core.Settings({}, ns.sounds); WindfuryProcSoundDB = ns.db
+    ns.ResetCounters(); lastRandomIndex = nil
+    if ns.RefreshOptions then ns.RefreshOptions() end
+    ns.Print("Options and session counters reset.")
+end
 
 local function observe(spellID, source, token)
     Core.TraceRecord(ns.trace, source, spellID, GetTime())
@@ -159,9 +230,10 @@ end
 function ns.Status()
     local d = ns.detector
     if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
-    ns.Print("Version 0.2.2; separate Weapon and Totem cooldown signatures.")
-    ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.GetSound(ns.db.sound).name .. "; " .. ns.db.channel .. " channel.")
-    ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures.")
+    ns.Print("Version 0.3.0; separate Weapon and Totem cooldown signatures.")
+    ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.db.volume .. "% addon volume; " .. ns.db.channel .. "; minimum gap " .. string.format("%.1f", ns.db.minGap) .. "s.")
+    ns.Print("Weapon: " .. ns.GetSound(ns.db.weaponSound).name .. "; Totem: " .. ns.GetSound(ns.db.totemSound).name .. "; random=" .. tostring(ns.db.randomSound) .. ".")
+    ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures; " .. ns.suppressed .. " cues muted or rate-limited.")
     ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ", cooldown=" .. tostring(ns.registered.SPELL_UPDATE_COOLDOWN) .. ", shaman=" .. tostring(ns.isShaman) .. ".")
     ns.Print("Both own-proc signals observed; playback and other-player isolation still need live verification.")
 end
@@ -219,7 +291,13 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
     if not ready then return end
     local cmd, arg = (text or ""):match("^%s*(%S*)%s*(.-)%s*$")
     cmd = cmd:lower()
-    if cmd == "test" then ns.Play(nil, true)
+    if cmd == "test" then ns.Play(nil, true, arg:lower())
+    elseif cmd == "stop" then ns.StopPlayback()
+    elseif cmd == "clearcounts" then ns.ResetCounters(); ns.Print("Session counters reset; options kept.")
+    elseif cmd == "volume" then
+        local value = tonumber(arg)
+        if value then ns.SetVolume(value); ns.Print("Addon volume: " .. ns.db.volume .. "%. Applies to subsequent cues; game channel/master settings still apply.")
+        else ns.Print("/wfps volume 0-100 (10% steps)") end
     elseif cmd == "status" then ns.Status()
     elseif cmd == "trace" then
         arg = arg:lower()
@@ -229,21 +307,19 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
         elseif arg == "" or arg == "show" then ns.ShowTrace()
         else ns.Print("/wfps trace on, show, stop, clear") end
     elseif cmd == "on" or cmd == "off" then
-        ns.db.enabled = cmd == "on"; ns.detector.events = {}; ns.Status()
+        ns.db.enabled = cmd == "on"; ns.detector.events = {}; if not ns.db.enabled then ns.StopPlayback() end; ns.Status()
         if ns.RefreshOptions then ns.RefreshOptions() end
     elseif cmd == "sound" then
+        local target, choice = arg:match("^(weapon)%s+(.+)$")
+        if not target then target, choice = arg:match("^(totem)%s+(.+)$") end
+        choice = choice or arg
         local found
         for i, sound in ipairs(ns.sounds) do
-            if arg == sound.id or tonumber(arg) == i then found = sound end
+            if choice == sound.id or tonumber(choice) == i then found = sound end
         end
-        if found then ns.db.sound = found.id; ns.Play(nil, true); if ns.RefreshOptions then ns.RefreshOptions() end
-        else ns.Print("Use /wfps to choose one of the " .. #ns.sounds .. " sounds, or /wfps sound NUMBER (1-" .. #ns.sounds .. ").") end
-    elseif cmd == "reset" then
-        ns.StopTrace(false); ns.trace = nil
-        ns.db = Core.Settings({}, ns.sounds); WindfuryProcSoundDB = ns.db; ns.detector:Reset()
-        ns.soundFailures = 0; unavailableWarned = false
-        if ns.RefreshOptions then ns.RefreshOptions() end
-        ns.Print("Options and session counters reset.")
+        if found then ns.SelectSound(found.id, target); ns.Play(found.id, true, target)
+        else ns.Print("/wfps sound NUMBER sets both; /wfps sound weapon NUMBER or /wfps sound totem NUMBER sets one. Use 1-" .. #ns.sounds .. ".") end
+    elseif cmd == "reset" then ns.ResetOptions()
     elseif cmd == "" or cmd == "options" then ns.ShowOptions()
-    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", status, trace on|show|stop|clear, on, off, reset") end
+    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", test totem, volume 0-100, stop, clearcounts, status, trace on|show|stop|clear, on, off, reset") end
 end

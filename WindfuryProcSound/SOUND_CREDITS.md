@@ -1,23 +1,25 @@
 Bundled Audio Credits and Provenance
 ====================================
-Verified 2026-11-14. The original 20 files are mono Ogg Vorbis at 44,100 Hz.
-Version 0.2.0 adds one unchanged stereo Ogg file from LightsaberCrit.
+Updated 2026-11-15. Nineteen custom cues are mono Vorbis at 44,100 Hz.
+One unchanged stereo source file comes from LightsaberCrit. Version 0.3.0
+uses native game audio for the Warcraft wolf and bundles quieter variants
+of the remaining 20 custom cues.
 The original audio set has public-domain / CC0 / original provenance.
 The added LightsaberCrit file has unverified underlying audio rights;
 it is not covered by this addon's code license and is not cleared here
 for public redistribution. No match to a Wago sound is claimed.
 
-1. Wolf Howl (wolf_howl.ogg)
-   Original: "Wolf howls" by the U.S. Fish and Wildlife Service.
-   https://commons.wikimedia.org/wiki/File:Wolf_howls.ogg
-   Original archived file:
-   https://upload.wikimedia.org/wikipedia/commons/8/87/Wolf_howls.ogg
-   Public domain: official-duty U.S. federal government work (PD-USGov-FWS),
-   as specifically identified on the file's archival source page.
-   Source file SHA1: 44ce16c609c16ce8ae05b4da61179bf6c9c4ce09 (verified).
-   Modified: first 2.8s excerpt, mono conversion, 44.1kHz resampling,
-   level adjustment, fades and Vorbis encoding. Genuine wolf recording.
-   No U.S. Fish and Wildlife Service endorsement is implied.
+1. Warcraft Wolf Howl (native game audio; no file bundled)
+   Blizzard Entertainment's WolfStandVar4 / WolfStandVar4b assets.
+   Native FileDataIDs: 564211 and 564217.
+   Verified asset paths: sound/creature/wolf/wolfstandvar4.ogg and
+   sound/creature/wolf/wolfstandvar4b.ogg.
+   Asset-path reference: https://github.com/wowdev/wow-listfile
+   Playback uses classic wolf-howl sound kit 1018 (WolfFidget2), with
+   modern wolf-howl kit 53875 as an unavailable-kit fallback.
+   Forever sound-kit availability still needs in-game preview validation.
+   This addon does not copy, extract, bundle or license Blizzard's audio.
+   The former public-domain animal recording is no longer included.
 
 2. Chicken (chicken.ogg)
    Original: "Chicken Single Alarm Call" by Rudmer_Rotteveel.
@@ -64,7 +66,7 @@ for public redistribution. No match to a Wago sound is claimed.
 
 See sound-catalog.json for per-file source links, modifications, durations, hashes
 and technical measurements. Attribution is included voluntarily for CC0.
-No creator endorsement is implied. The original 20 normalized cues peak below -4 dBFS.
+No creator endorsement is implied. The 19 normalized custom cues peak below -4 dBFS.
 The unchanged LightsaberCrit clip peaks around -3 dBFS and is louder
 (mean approximately -11.7 dBFS). The selected sounds have been decoded and checked for valid
 format, non-silent signal, duration and clipping; they have not been tested
@@ -86,3 +88,11 @@ inside the World of Warcraft client.
    its underlying audio is licensed for redistribution.
    Do not assume the project's MIT label clears the audio. Confirm permission
    from its rights holder, or remove this file before public distribution.
+
+Volume variants (version 0.3.0)
+   Each custom cue has nine derived variants under sounds/volume_10 through
+   sounds/volume_90. PCM amplitude is scaled directly from the original by
+   0.1 through 0.9, without normalization or amplification, then re-encoded.
+   The 100% files remain byte-identical. The variants retain the original
+   asset's rights status. See volume_manifest.json and tools/prepare_volume.py.
+   Native Warcraft Wolf Howl instead uses the game's SoundKit volume override.

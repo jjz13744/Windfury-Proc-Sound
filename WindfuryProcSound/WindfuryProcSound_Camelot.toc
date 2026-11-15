@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: Windfury Proc Sound
-## Notes: Twenty-one selectable sound cues for readable player Windfury proc events in WoW Forever.
+## Notes: Windfury proc cues with addon-only volume, separate Weapon/Totem sounds, and playback options.
 ## Author: Jared Zengo
-## Version: 0.2.2
+## Version: 0.3.0
 ## SavedVariables: WindfuryProcSoundDB, WindfurySaberDB
 ## OptionalDeps: WindfurySaber
 ## X-Category: Audio & Video

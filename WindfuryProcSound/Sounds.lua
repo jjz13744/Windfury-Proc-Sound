@@ -1,7 +1,7 @@
 local _, ns = ...
 ns.sounds = {
     { id = "lightsaber", name = "Sci-fi blade", file = "lightsaber.ogg" },
-    { id = "wolf_howl", name = "Wolf Howl", file = "wolf_howl.ogg" },
+    { id = "wolf_howl", name = "Warcraft Wolf Howl", soundKit = 1018, fallbackSoundKit = 53875 },
     { id = "chicken", name = "Chicken", file = "chicken.ogg" },
     { id = "laser_pulse", name = "Laser Pulse", file = "laser_pulse.ogg" },
     { id = "laser_burst", name = "Laser Burst", file = "laser_burst.ogg" },

@@ -38,3 +38,15 @@ The user then ran separate tests and reported two observed procs in each:
 Neither trace showed a matching player cast or added aura. Both trace screenshots had zero omitted rows. These are direct user-supplied live observations; the implementation now matches these two exact payloads, with separate counters and settings. Summon/application IDs are not used. The Totem rank mapping 10608/10610 is retained from GaleCount's proc family, but those ranks are not yet live-tested. Tests replay the observations through the real addon handlers with mocked playback.
 
 This establishes the observed signatures, not universal event delivery or audible playback of this new version. Other-player isolation still needs a negative test. The addon reads only public local-client cooldown fields, never reconstructs target hit timing, and does not bypass secret restrictions.
+
+## Addon-only volume and native wolf (version 0.3.0)
+
+The Forever generated Sound API defines C_Sound.PlaySound with six parameters: soundKitID, uiSoundSubType, forceNoDuplicates, runFinishCallback, overridePriority, volumeOverride. This is used only for the native Warcraft wolf. It does not accept custom file paths, and there is no documented handle-volume setter. Custom cues instead use pre-rendered attenuated files; no global audio CVar is changed.
+https://github.com/Gethe/wow-ui-source/blob/bebcb6bf309cf41b41bd74f8ca651e6a105b2676/Interface/AddOns/Blizzard_APIDocumentationGenerated/SoundDocumentation.lua
+https://ffmpeg.org/ffmpeg-filters.html#volume
+
+The native slider methods (including SetValueStep and SetObeyStepOnDrag) are documented for this client:
+https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleSliderAPIDocumentation.lua
+
+Warcraft's wolf howl assets are WolfStandVar4 / WolfStandVar4b, FileDataIDs564211/564217. The known classic WolfFidget2 kit1018 is tried first; modern wolf-howl kit53875 is an unavailable-kit fallback. These exact kits are not yet runtime-tested in the user's Forever client. No game asset is extracted or bundled.
+https://github.com/wowdev/wow-listfile

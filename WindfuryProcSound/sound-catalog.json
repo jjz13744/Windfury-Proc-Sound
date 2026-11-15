@@ -22,25 +22,22 @@
   },
   {
     "id": "wolf_howl",
-    "name": "Wolf Howl",
-    "filename": "wolf_howl.ogg",
-    "duration": 2.792,
-    "sample_rate": 44100,
-    "channels": 1,
-    "codec": "Vorbis",
-    "peak_dbfs": -9.07,
-    "rms_dbfs": -21.02,
-    "bytes": 28686,
-    "sha256": "eefad212eebdcb0726957f4467d81c74f358adccfef611f33438ef1092a1736b",
-    "author": "U.S. Fish and Wildlife Service",
-    "original_title": "Wolf howls",
-    "source_url": "https://commons.wikimedia.org/wiki/File:Wolf_howls.ogg",
-    "download_url": "https://upload.wikimedia.org/wikipedia/commons/8/87/Wolf_howls.ogg",
-    "source_filename": "wolf-fws.ogg",
-    "license": "Public domain: U.S. federal government official-duty work (PD-USGov-FWS)",
-    "license_url": "https://commons.wikimedia.org/wiki/File:Wolf_howls.ogg",
-    "changes": "First 2.8 seconds excerpted; mono conversion, 44.1 kHz resampling, level adjustment, edge fades, Vorbis encoding. Original file SHA1 verified against source metadata: 44ce16c609c16ce8ae05b4da61179bf6c9c4ce09.",
-    "file": "wolf_howl.ogg"
+    "name": "Warcraft Wolf Howl",
+    "kind": "native_sound_kit",
+    "sound_kit_id": 1018,
+    "fallback_sound_kit_id": 53875,
+    "native_asset_file_data_ids": [
+      564211,
+      564217
+    ],
+    "native_asset_paths": [
+      "sound/creature/wolf/wolfstandvar4.ogg",
+      "sound/creature/wolf/wolfstandvar4b.ogg"
+    ],
+    "source_url": "https://github.com/wowdev/wow-listfile",
+    "author": "Blizzard Entertainment",
+    "license": "Game-owned asset, not bundled or redistributed by this addon",
+    "changes": "Replaced the former non-Warcraft recording. Playback uses the installed game sound kit with its per-sound volume override. Known classic and modern wolf-howl kit IDs are tried in that order; availability in the user client still needs preview validation."
   },
   {
     "id": "chicken",

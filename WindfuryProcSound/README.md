@@ -1,12 +1,12 @@
 # Windfury Proc Sound
 
-A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes wolf howl, chicken, and an original sci-fi blade cue.
+A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes the native Warcraft wolf howl, chicken, and an original sci-fi blade cue.
 
-**Status: 0.2.2 event-detection fix.** Separate live traces showed two Weapon procs with two matching cooldown events, then two Totem procs with two different matching events. This version uses those distinct signatures. Automated replays pass; audible playback with this version and isolation from other players still need live verification.
+**Version 0.3.0:** addon-only volume, separate Weapon/Totem sounds, playback options, and native Warcraft wolf audio. The proc filters are unchanged from 0.2.2, which matched isolated live traces. New audio/UI behavior still needs in-game verification.
 
 ## Install on Windows
 
-1. Exit World of Warcraft completely.
+1. Exit World of Warcraft completely. This update adds new audio files; a full restart is recommended, not only `/reload`.
 2. Extract the release ZIP. Copy its **WindfuryProcSound** folder into:
    `World of Warcraft\_forever_\Interface\AddOns\`
 3. Check that the final path is `...\AddOns\WindfuryProcSound\WindfuryProcSound.toc`, not a second nested folder.
@@ -23,27 +23,39 @@ If you already removed the old addon, the new version uses defaults. Your old sa
 
 ## Options
 
-- **21 sound buttons**, each with a separate Play preview.
-- Enable/disable all proc cues.
-- Toggle Windfury Weapon and Windfury Totem separately.
-- Choose **Master** (default) or **SFX** audio channel. The addon never changes game volume, CVars, or default sounds.
-- Type `/wfps` or open **Settings → AddOns → Windfury Proc Sound → Open sound options** when that Settings API is available.
+Open `/wfps`, or **Settings → AddOns → Windfury Proc Sound → Open sound options** when supported.
+
+**Sounds tab**
+- Choose **Both**, **Weapon**, or **Totem**, then one of the 21 sound buttons. Each has a Play preview.
+- Weapon and Totem may use different cues. Existing selections automatically migrate to both.
+- **Warcraft Wolf Howl** now uses native game sound kits, replacing the non-Warcraft animal recording. No Blizzard audio is bundled. The known classic howl kit is tried first, with its modern equivalent as fallback; preview it to verify your client supports it.
+
+**Playback tab**
+- **Addon volume:** 0–100% in 10% steps. 0% mutes and stops the current addon cue. Other changes apply to subsequent cues.
+- **Master / SFX channel:** keeps your current choice. Game channel/master volume and mute settings still apply.
+- **Minimum gap:** 0–2 seconds in 0.1-second steps. Default 0 plays every detected proc; longer gaps limit audio without changing proc counts. Manual previews bypass this gap.
+- **Random sound each proc:** off by default; avoids immediately repeating the last random cue.
+- **Preview when selecting:** off by default.
+- **Stop current sound**, **Reset counters** (keeps options), and **Restore defaults**.
+
+The addon never changes global volume CVars. Custom sounds use pre-rendered quieter files, with unchanged originals at 100%; native Warcraft audio uses its per-sound SoundKit volume override. Missing quiet files never fall back to full volume. Only one addon cue plays at a time.
 
 Commands:
 
 | Command | Action |
 | --- | --- |
 | `/wfps` | Open options |
-| `/wfps test` | Preview selected sound, even if automatic cues are disabled |
-| `/wfps sound 1` | Select and preview sound 1; numbers 1–21 are supported |
-| `/wfps status` | Show event registration, readable/restricted candidate counts, proc count and playback failures |
-| `/wfps on` / `/wfps off` | Enable or disable automatic cues |
-| `/wfps reset` | Restore default options and clear session counters |
-| `/wfps trace on` | Capture up to 30 seconds of public diagnostic events |
-| `/wfps trace show` | Stop and show the latest trace summary |
-| `/wfps trace stop` / `/wfps trace clear` | Stop capture / remove the captured trace |
-
-Only one cue plays at a time. A new cue stops the preceding one to prevent audio stacking. Short sound previews can still be loud depending on your game volume.
+| `/wfps test` / `/wfps test totem` | Preview the selected Weapon / Totem sound |
+| `/wfps sound 1` | Set both proc sounds to option 1; supports numbers 1–21 or IDs |
+| `/wfps sound weapon 21` / `/wfps sound totem 3` | Change one proc's sound |
+| `/wfps volume 50` | Set addon volume, snapped to 10% steps |
+| `/wfps stop` | Stop the current addon sound |
+| `/wfps clearcounts` | Reset counters without changing options |
+| `/wfps status` | Show selections, volume, counts, muted/rate-limited cues and failures |
+| `/wfps on` / `/wfps off` | Enable / disable automatic cues |
+| `/wfps reset` | Restore defaults and clear counters |
+| `/wfps trace on` / `/wfps trace show` | Start / stop and show a short diagnostic trace |
+| `/wfps trace stop` / `/wfps trace clear` | Stop / remove the trace |
 
 ## Proc detection
 
@@ -74,19 +86,19 @@ For a short diagnostic capture:
 3. Share the summary and whether you observed your own proc. Separately test with another player proccing while you do not attack.
 4. `/reload` or normal logout saves the trace with addon settings. Do this when convenient, outside combat. `/wfps trace clear` removes it.
 
-The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Tracing does not change normal sound triggers. Version 0.2.2 uses the two isolated cooldown signatures above. Party isolation, additional client builds and higher Totem ranks remain unverified. See `SOURCES.md`.
+The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Tracing does not change normal sound triggers. The addon retains the two isolated cooldown signatures above. Party isolation, additional client builds and higher Totem ranks remain unverified. See `SOURCES.md`.
 
 ## Sound rights and provenance
 
-The bundled sci-fi blade is an **original synthesized sound**, not the exact audio from the linked Wago aura or a Star Wars recording. Wolf and chicken are real recordings. Other effects come from the creator's CC0 sound pack. The separately requested LightsaberCrit proc file is not part of that CC0/original set and is louder than the normalized cues. See `WindfuryProcSound/SOUND_CREDITS.md` for the complete asset list, source URLs, licenses, and processing notes.
+The bundled sci-fi blade is an **original synthesized sound**, not the exact audio from the linked Wago aura or a Star Wars recording. Chicken is a real recording; the Warcraft wolf plays from the installed game. Other effects come from the creator's CC0 sound pack. The separately requested LightsaberCrit proc file is not part of that CC0/original set and is louder than the normalized cues. See `WindfuryProcSound/SOUND_CREDITS.md` for the complete asset list, source URLs, licenses, and processing notes.
 
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.2.2.zip`.
+- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.0.zip`.
 - Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
-- `ffmpeg`/`ffprobe` can verify that all bundled OGG files decode successfully.
+- `python3 tools/prepare_volume.py --verify-only` verifies all 180 quieter custom-file variants and their hashes, amplitude, duration and decoding.
 
 ## License
 
-Original addon code is MIT. The original 20 sounds have separate original/CC0/public-domain provenance. The additional LightsaberCrit file has unverified audio-rights coverage. See the credits. World of Warcraft and Star Wars are trademarks of their respective owners. This project is unofficial and unaffiliated.
+Original addon code is MIT. Nineteen custom cues have original/CC0 provenance. Native Warcraft audio is not redistributed. The additional LightsaberCrit file has unverified audio-rights coverage. See the credits. World of Warcraft and Star Wars are trademarks of their respective owners. This project is unofficial and unaffiliated.

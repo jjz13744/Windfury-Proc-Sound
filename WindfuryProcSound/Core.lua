@@ -8,11 +8,26 @@ Core.procIDs = {
     [439440] = "weapon", [8233] = "weapon", [8236] = "weapon", [10484] = "weapon", [16361] = "weapon",
     [8516] = "totem", [10608] = "totem", [10610] = "totem",
 }
-Core.defaults = { enabled = true, weapon = true, totem = true, sound = "lightsaber", channel = "Master" }
+Core.defaults = {
+    enabled = true, weapon = true, totem = true, sound = "lightsaber", channel = "Master",
+    volume = 100, minGap = 0, randomSound = false, previewOnSelect = false,
+}
 Core.window = 0.25
 
 function Core.IsSecret(value)
     return type(issecretvalue) == "function" and issecretvalue(value)
+end
+
+function Core.Snap(value, low, high, step, fallback)
+    if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return fallback end
+    return math.max(low, math.min(high, math.floor(value / step + 0.5) * step))
+end
+
+function Core.SoundPath(addon, file, volume)
+    volume = Core.Snap(volume, 0, 100, 10, 100)
+    if volume == 0 then return nil end
+    local folder = volume < 100 and ("volume_" .. volume .. "\\") or ""
+    return "Interface\\AddOns\\" .. addon .. "\\sounds\\" .. folder .. file
 end
 
 function Core.Settings(saved, catalog)
@@ -25,6 +40,13 @@ function Core.Settings(saved, catalog)
     local valid = false
     for _, sound in ipairs(catalog) do if sound.id == out.sound then valid = true end end
     if not valid then out.sound = Core.defaults.sound end
+    for _, kind in ipairs({"weapon", "totem"}) do
+        local key = kind .. "Sound"
+        out[key] = out.sound
+        for _, sound in ipairs(catalog) do if sound.id == saved[key] then out[key] = sound.id end end
+    end
+    out.volume = Core.Snap(out.volume, 0, 100, 10, Core.defaults.volume)
+    out.minGap = Core.Snap(out.minGap, 0, 2, 0.1, Core.defaults.minGap)
     return out
 end
 
