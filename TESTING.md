@@ -1,9 +1,9 @@
 # Verification report
 
-2026-11-15, version 0.3.1
+2026-11-15, version 0.3.2
 
 Passed locally:
-- 268 Lua assertions using the real addon modules with mocked WoW APIs.
+- 272 Lua assertions using the real addon modules with mocked WoW APIs.
 - Existing exact Weapon/Totem trace replays, all event filtering, secret guards, independent toggles and duplicate suppression remain covered.
 - Old shared sound selections migrate to both new per-proc choices. Separate UI and slash selections preserve the other choice.
 - Volume snaps to 10% steps;0% skips playback and stops only the owned handle;100% uses unchanged custom originals; lower levels use the matching variant path.
@@ -11,8 +11,10 @@ Passed locally:
 - Missing quiet files never fall back to a full-volume original.
 - Random cues avoid immediate repeats. Preview ignores random mode, respects volume and bypasses the automatic cue interval.
 - Minimum-gap setting limits audio, not proc counts; reset counters keeps settings; disable/stop stops the owned sound.
-- Real UI callbacks exercised for tabs, sliders, selection previews, Close/reopen and reset. Refresh guards prevent slider recursion. Static review confirmed control bounds within600x650.
-- Independent code review found no new defects; native game UI rendering still requires validation.
+- Real UI callbacks exercised for tabs, sliders, selection previews, Close/reopen and reset. Refresh guards prevent slider recursion. Static review confirmed control bounds within 640×600. Smaller-screen scaling and three-tab visibility are covered.
+- Independent UI review found no functional blockers. Its 28 additional checks cover diagnostics callbacks, tab-state retention, repeated navigation, and settings preservation (300 total assertions including the repository suite).
+- Internal layout approximations were inspected for all three tabs; these are not native-game screenshots. Native font metrics and rendering still require in-game validation.
+- All 200 bundled audio files are byte-identical to the 0.3.1 release. Only UI code, UI tests, version labels, and documentation changed.
 - Package verifies both TOCs, one-folder install layout,21catalog choices,20custom originals,180volume variants, exact SHA256hashes and ZIP integrity.
 
 Audio measurements:

@@ -48,6 +48,7 @@ local function widget()
     function f:SetText(v) self.textValue = v end
     function f:SetPoint(...) self.point = {...} end
     function f:SetSize(w,h) self.width=w; self.height=h end
+    function f:SetScale(v) self.scale=v end
     function f:SetChecked(v) self.checked = v end
     function f:SetValue(v) self.value=v; if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self,v) end end
     function f:GetValue() return self.value end
@@ -113,10 +114,10 @@ SlashCmdList.WINDFURYPROCSOUND("test")
 check(#played==3, "manual preview works when disabled")
 SlashCmdList.WINDFURYPROCSOUND("options")
 check(WindfuryProcSoundOptions.shown, "options opens")
-check(WindfuryProcSoundOptions.height == 650, "tabbed options window fits all controls")
+check(WindfuryProcSoundOptions.height == 600, "tabbed options window fits all controls")
 local positions, selectable = {}, 0
 for _, f in ipairs(frames) do
-    if f.width == 197 and f.point then
+    if f.width == 146 and f.point then
         local key = tostring(f.point[2]) .. ":" .. tostring(f.point[3])
         check(not positions[key], "sound buttons do not overlap")
         positions[key] = true; selectable = selectable + 1
@@ -449,4 +450,19 @@ PlaySoundFile=normalFilePlay
 ui.SetVolume(0);n=#played
 check(ui.Play("wolf_howl",true) and #played==n,"zero volume also mutes native howl")
 ui.SetVolume(100)
+
+
+-- Compact three-tab layout and smaller-screen scaling.
+clickText("Diagnostics")
+check(WindfuryProcSoundDiagnosticsPanel.shown and not WindfuryProcSoundSoundPanel.shown and not WindfuryProcSoundPlaybackPanel.shown,"diagnostics has its own uncluttered tab")
+clickText("Playback");clickText("Sounds")
+check(WindfuryProcSoundSoundPanel.shown and not WindfuryProcSoundDiagnosticsPanel.shown,"returning to Sounds hides other content")
+UIParent.GetWidth=function() return 520 end
+UIParent.GetHeight=function() return 500 end
+WindfuryProcSoundOptions:Hide();ui.ShowOptions()
+check(WindfuryProcSoundOptions.scale<1 and WindfuryProcSoundOptions.width*WindfuryProcSoundOptions.scale<=488 and WindfuryProcSoundOptions.height*WindfuryProcSoundOptions.scale<=468,"options scale to smaller available UI area")
+UIParent.GetWidth=function() return 1920 end
+UIParent.GetHeight=function() return 1080 end
+WindfuryProcSoundOptions:Hide();ui.ShowOptions()
+check(WindfuryProcSoundOptions.scale==1,"normal screens preserve readable native scale")
 print("PASS: " .. tests .. " assertions. Mocked API/UI tests; native game audio and layout require live checks.")

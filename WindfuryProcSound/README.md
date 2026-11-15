@@ -2,11 +2,11 @@
 
 A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes the native Warcraft wolf howl, chicken, and an original sci-fi blade cue.
 
-**Version 0.3.1:** trimmed custom-sound lead-ins, addon-only volume, separate Weapon/Totem sounds, playback options, and native Warcraft wolf audio. The proc filters are unchanged from 0.2.2, which matched isolated live traces. New audio/UI behavior still needs in-game verification.
+**Version 0.3.2:** a cleaner three-tab options window, compact sound grid, separate cue previews, and automatic sizing for smaller screens. All 0.3.1 sound timing, audio files, proc filters, and saved settings are preserved. Native UI rendering still needs in-game verification.
 
 ## Install on Windows
 
-1. Exit World of Warcraft completely. This update adds new audio files; a full restart is recommended, not only `/reload`.
+1. Exit World of Warcraft completely. A full restart ensures all audio files are available. Updating only from 0.3.1 to 0.3.2 changes no audio files, so `/reload` is sufficient when safe.
 2. Extract the release ZIP. Copy its **WindfuryProcSound** folder into:
    `World of Warcraft\_forever_\Interface\AddOns\`
 3. Check that the final path is `...\AddOns\WindfuryProcSound\WindfuryProcSound.toc`, not a second nested folder.
@@ -26,6 +26,7 @@ If you already removed the old addon, the new version uses defaults. Your old sa
 Open `/wfps`, or **Settings → AddOns → Windfury Proc Sound → Open sound options** when supported.
 
 **Sounds tab**
+- All 21 choices appear in a compact three-column grid. The window scales down if needed to fit your screen.
 - Choose **Both**, **Weapon**, or **Totem**, then one of the 21 sound buttons. Each has a Play preview.
 - Weapon and Totem may use different cues. Existing selections automatically migrate to both.
 - **Warcraft Wolf Howl** now uses native game sound kits, replacing the non-Warcraft animal recording. No Blizzard audio is bundled. The known classic howl kit is tried first, with its modern equivalent as fallback; preview it to verify your client supports it.
@@ -34,9 +35,16 @@ Open `/wfps`, or **Settings → AddOns → Windfury Proc Sound → Open sound op
 - **Addon volume:** 0–100% in 10% steps. 0% mutes and stops the current addon cue. Other changes apply to subsequent cues.
 - **Master / SFX channel:** keeps your current choice. Game channel/master volume and mute settings still apply.
 - **Minimum gap:** 0–2 seconds in 0.1-second steps. Default 0 plays every detected proc; longer gaps limit audio without changing proc counts. Manual previews bypass this gap.
-- **Random sound each proc:** off by default; avoids immediately repeating the last random cue.
-- **Preview when selecting:** off by default.
-- **Stop current sound**, **Reset counters** (keeps options), and **Restore defaults**.
+- **Random cue each proc:** off by default; avoids immediately repeating the last random cue.
+- **Preview on selection:** off by default.
+- **Restore defaults** resets sounds and playback settings.
+
+**Diagnostics tab**
+- Session proc counts, playback failures, muted/rate-limited cues, and readable/restricted event totals.
+- **Refresh**, **Reset counters** (keeps options), and **Print status**.
+- **Start trace**, **Show / stop**, and **Clear trace** for short troubleshooting captures.
+
+Enable alerts and the Weapon/Totem toggles remain visible at the top. The selected cues, **Stop sound**, and separate **Preview Weapon / Preview Totem** buttons stay visible below every tab. Changes save automatically; Escape or **Close** dismisses the window.
 
 The addon never changes global volume CVars. Custom sounds use pre-rendered quieter files, with the full-level custom files at 100%; native Warcraft audio uses its per-sound SoundKit volume override. Missing quiet files never fall back to full volume. Only one addon cue plays at a time.
 
@@ -99,7 +107,7 @@ The bundled sci-fi blade is an **original synthesized sound**, not the exact aud
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.1.zip`.
+- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.2.zip`.
 - Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
 - `python3 tools/prepare_volume.py --verify-only` verifies all 180 quieter custom-file variants and their hashes, amplitude, duration and decoding.
 

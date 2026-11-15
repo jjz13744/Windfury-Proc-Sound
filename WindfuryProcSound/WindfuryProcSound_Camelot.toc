@@ -2,7 +2,7 @@
 ## Title: Windfury Proc Sound
 ## Notes: Windfury proc cues with addon-only volume, separate Weapon/Totem sounds, and playback options.
 ## Author: Jared Zengo
-## Version: 0.3.1
+## Version: 0.3.2
 ## SavedVariables: WindfuryProcSoundDB, WindfurySaberDB
 ## OptionalDeps: WindfurySaber
 ## X-Category: Audio & Video

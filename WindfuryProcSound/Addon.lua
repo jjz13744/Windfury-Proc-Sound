@@ -230,7 +230,7 @@ end
 function ns.Status()
     local d = ns.detector
     if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
-    ns.Print("Version 0.3.1; separate Weapon and Totem cooldown signatures.")
+    ns.Print("Version 0.3.2; separate Weapon and Totem cooldown signatures.")
     ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.db.volume .. "% addon volume; " .. ns.db.channel .. "; minimum gap " .. string.format("%.1f", ns.db.minGap) .. "s.")
     ns.Print("Weapon: " .. ns.GetSound(ns.db.weaponSound).name .. "; Totem: " .. ns.GetSound(ns.db.totemSound).name .. "; random=" .. tostring(ns.db.randomSound) .. ".")
     ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures; " .. ns.suppressed .. " cues muted or rate-limited.")

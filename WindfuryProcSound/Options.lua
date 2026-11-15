@@ -1,7 +1,7 @@
 local ADDON, ns = ...
-local window, soundPanel, playbackPanel, summary, detail, targetLabel
+local window, soundPanel, playbackPanel, diagnosticsPanel, weaponSummary, totemSummary, detail, targetLabel, diagnosticsText
 local enable, weapon, totem, master, sfx, volume, volumeValue, gap, gapValue, random, preview
-local soundTab, playbackTab
+local soundTab, playbackTab, diagnosticsTab
 local choices, targetButtons = {}, {}
 local target = "both"
 local refreshing = false
@@ -32,7 +32,7 @@ end
 
 local function slider(parent, name, low, high, step, x, y, action)
     local s = CreateFrame("Slider", name, parent, "BackdropTemplate")
-    s:SetSize(400, 18); s:SetPoint("TOPLEFT", x, y)
+    s:SetSize(420, 18); s:SetPoint("TOPLEFT", x, y)
     s:SetOrientation("HORIZONTAL"); s:SetMinMaxValues(low, high)
     s:SetValueStep(step); s:SetObeyStepOnDrag(true)
     s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
@@ -43,11 +43,21 @@ local function slider(parent, name, low, high, step, x, y, action)
     return s
 end
 
+local function fitWindow()
+    if not window or not UIParent or type(UIParent.GetWidth) ~= "function" or type(UIParent.GetHeight) ~= "function" then return end
+    local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+    if ns.Core.IsSecret(width) or ns.Core.IsSecret(height) or type(width) ~= "number" or type(height) ~= "number" then return end
+    if width > 0 and height > 0 then window:SetScale(math.max(0.1, math.min(1, (width - 32) / 640, (height - 32) / 600))) end
+end
+
 local function showTab(which)
-    if which == "playback" then soundPanel:Hide(); playbackPanel:Show()
-    else playbackPanel:Hide(); soundPanel:Show() end
-    soundTab:SetEnabled(which == "playback")
+    soundPanel:Hide(); playbackPanel:Hide(); diagnosticsPanel:Hide()
+    if which == "playback" then playbackPanel:Show()
+    elseif which == "diagnostics" then diagnosticsPanel:Show()
+    else soundPanel:Show() end
+    soundTab:SetEnabled(which ~= "sounds")
     playbackTab:SetEnabled(which ~= "playback")
+    diagnosticsTab:SetEnabled(which ~= "diagnostics")
     ns.RefreshOptions()
 end
 
@@ -64,14 +74,17 @@ function ns.RefreshOptions()
     for id, b in pairs(choices) do b:SetText((selected == id and "|cff70ff90> |r" or "") .. ns.GetSound(id).name) end
     for name, b in pairs(targetButtons) do b:SetEnabled(name ~= target) end
     targetLabel:SetText(target == "both" and "Choose a sound for both proc types:" or ("Choose a sound for " .. (target == "weapon" and "Weapon:" or "Totem:")))
-    summary:SetText("Weapon: " .. ns.GetSound(ns.db.weaponSound).name .. "  |  Totem: " .. ns.GetSound(ns.db.totemSound).name)
+    weaponSummary:SetText(ns.GetSound(ns.db.weaponSound).name)
+    totemSummary:SetText(ns.GetSound(ns.db.totemSound).name)
+    local d = ns.detector
+    diagnosticsText:SetText("Weapon procs: " .. d.weapon .. "    Totem procs: " .. d.totem .. "\n\nPlayback failures: " .. ns.soundFailures .. "    Muted / rate-limited: " .. ns.suppressed .. "\n\nReadable candidates: " .. d.readable .. "    Restricted payloads skipped: " .. d.restricted)
     detail:SetText(ns.db.volume .. "% addon volume  |  " .. ns.db.channel .. "  |  " .. (ns.db.randomSound and "Random cues on" or "Selected cues") .. "  |  Gap " .. string.format("%.1f", ns.db.minGap) .. "s")
     refreshing = false
 end
 
 local function makeWindow()
     window = CreateFrame("Frame", "WindfuryProcSoundOptions", UIParent, "BackdropTemplate")
-    window:SetSize(600, 650); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
+    window:SetSize(640, 600); window:SetPoint("CENTER"); window:SetFrameStrata("DIALOG")
     window:SetClampedToScreen(true); window:EnableMouse(true); window:SetMovable(true)
     window:RegisterForDrag("LeftButton")
     window:SetScript("OnDragStart", function(self) self:StartMoving() end)
@@ -79,61 +92,74 @@ local function makeWindow()
     window:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=32, insets={left=8,right=8,top=8,bottom=8} })
     local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -4, -4); close:SetScript("OnClick", function() window:Hide() end)
-    label(window, "Windfury Proc Sound", 22, -22, "GameFontNormalLarge")
-    label(window, "Changes save automatically. Preview buttons always use your addon volume.", 22, -48, "GameFontHighlightSmall")
-    enable = check(window, "Enable", 18, -67, "enabled")
-    weapon = check(window, "Windfury Weapon", 150, -67, "weapon")
-    totem = check(window, "Windfury Totem", 360, -67, "totem")
-    soundTab = button(window, "Sounds", 115, 22, -108, function() showTab("sounds") end)
-    playbackTab = button(window, "Playback", 115, 145, -108, function() showTab("playback") end)
+    label(window, "Windfury Proc Sound", 24, -22, "GameFontNormalLarge")
+    label(window, "Your Windfury cues, your way. Changes save automatically.", 24, -48, "GameFontHighlightSmall")
+    enable = check(window, "Enable alerts", 20, -72, "enabled")
+    weapon = check(window, "Windfury Weapon", 200, -72, "weapon")
+    totem = check(window, "Windfury Totem", 400, -72, "totem")
+    soundTab = button(window, "Sounds", 115, 24, -112, function() showTab("sounds") end)
+    playbackTab = button(window, "Playback", 115, 147, -112, function() showTab("playback") end)
+    diagnosticsTab = button(window, "Diagnostics", 115, 270, -112, function() showTab("diagnostics") end)
     soundPanel = CreateFrame("Frame", "WindfuryProcSoundSoundPanel", window)
-    soundPanel:SetPoint("TOPLEFT", 22, -150); soundPanel:SetSize(556, 390)
+    soundPanel:SetPoint("TOPLEFT", 24, -158); soundPanel:SetSize(592, 290)
     playbackPanel = CreateFrame("Frame", "WindfuryProcSoundPlaybackPanel", window)
-    playbackPanel:SetPoint("TOPLEFT", 22, -150); playbackPanel:SetSize(556, 390)
-    targetLabel = label(soundPanel, "", 0, -5, "GameFontHighlightSmall")
-    targetButtons.both = button(soundPanel, "Both", 75, 302, 0, function() target="both"; ns.RefreshOptions() end)
-    targetButtons.weapon = button(soundPanel, "Weapon", 82, 382, 0, function() target="weapon"; ns.RefreshOptions() end)
-    targetButtons.totem = button(soundPanel, "Totem", 82, 469, 0, function() target="totem"; ns.RefreshOptions() end)
-    local rows = math.ceil(#ns.sounds / 2)
+    playbackPanel:SetPoint("TOPLEFT", 24, -158); playbackPanel:SetSize(592, 290)
+    diagnosticsPanel = CreateFrame("Frame", "WindfuryProcSoundDiagnosticsPanel", window)
+    diagnosticsPanel:SetPoint("TOPLEFT", 24, -158); diagnosticsPanel:SetSize(592, 290)
+    targetLabel = label(soundPanel, "", 0, -6, "GameFontHighlightSmall")
+    targetButtons.both = button(soundPanel, "Both", 75, 310, 0, function() target="both"; ns.RefreshOptions() end)
+    targetButtons.weapon = button(soundPanel, "Weapon", 90, 392, 0, function() target="weapon"; ns.RefreshOptions() end)
+    targetButtons.totem = button(soundPanel, "Totem", 90, 489, 0, function() target="totem"; ns.RefreshOptions() end)
+    local rows = math.ceil(#ns.sounds / 3)
     for i, sound in ipairs(ns.sounds) do
         local choice = sound
         local col, row = math.floor((i - 1) / rows), (i - 1) % rows
-        local x, y = col * 284, -42 - row * 31
-        choices[choice.id] = button(soundPanel, choice.name, 197, x, y, function()
+        local x, y = col * 200, -46 - row * 34
+        choices[choice.id] = button(soundPanel, choice.name, 146, x, y, function()
             ns.SelectSound(choice.id, target)
             if ns.db.previewOnSelect then ns.Play(choice.id, true) end
         end)
-        button(soundPanel, "Play", 62, x + 202, y, function() ns.Play(choice.id, true) end)
+        button(soundPanel, "Play", 42, x + 150, y, function() ns.Play(choice.id, true) end)
     end
-    label(playbackPanel, "Addon volume (10% steps)", 2, -6)
-    volume = slider(playbackPanel, "WindfuryProcSoundVolumeSlider", 0, 100, 10, 18, -36, ns.SetVolume)
-    volumeValue = label(playbackPanel, "", 444, -37)
-    label(playbackPanel, "0% / muted", 18, -61, "GameFontHighlightSmall")
-    label(playbackPanel, "100% / full", 328, -61, "GameFontHighlightSmall")
-    label(playbackPanel, "Audio channel:", 2, -103)
-    master = button(playbackPanel, "Master", 82, 145, -96, function() ns.db.channel="Master"; ns.RefreshOptions() end)
-    sfx = button(playbackPanel, "SFX", 82, 232, -96, function() ns.db.channel="SFX"; ns.RefreshOptions() end)
-    label(playbackPanel, "Minimum gap between automatic cues", 2, -151)
-    gap = slider(playbackPanel, "WindfuryProcSoundGapSlider", 0, 2, 0.1, 18, -182, function(value)
+    label(playbackPanel, "Addon volume", 2, -4)
+    volume = slider(playbackPanel, "WindfuryProcSoundVolumeSlider", 0, 100, 10, 18, -32, ns.SetVolume)
+    volumeValue = label(playbackPanel, "", 466, -33)
+    label(playbackPanel, "0% mutes  /  100% full. Game audio settings still apply.", 18, -58, "GameFontHighlightSmall")
+    label(playbackPanel, "Audio channel", 2, -98)
+    master = button(playbackPanel, "Master", 82, 145, -91, function() ns.db.channel="Master"; ns.RefreshOptions() end)
+    sfx = button(playbackPanel, "SFX", 82, 232, -91, function() ns.db.channel="SFX"; ns.RefreshOptions() end)
+    label(playbackPanel, "Minimum gap between cues", 2, -137)
+    gap = slider(playbackPanel, "WindfuryProcSoundGapSlider", 0, 2, 0.1, 18, -164, function(value)
         ns.db.minGap=ns.Core.Snap(value,0,2,0.1,0); ns.RefreshOptions()
     end)
-    gapValue = label(playbackPanel, "", 444, -183)
-    label(playbackPanel, "0s / every detected proc", 18, -207, "GameFontHighlightSmall")
-    label(playbackPanel, "2 seconds", 354, -207, "GameFontHighlightSmall")
-    random = check(playbackPanel, "Random sound each proc (no immediate repeats)", -4, -243, "randomSound")
-    preview = check(playbackPanel, "Preview when selecting a sound", -4, -278, "previewOnSelect")
-    button(playbackPanel, "Stop current sound", 165, 0, -325, ns.StopPlayback)
-    button(playbackPanel, "Reset counters", 145, 180, -325, function() ns.ResetCounters(); ns.Print("Session counters reset; options kept.") end)
-    button(playbackPanel, "Restore defaults", 145, 340, -325, ns.ResetOptions)
-    label(playbackPanel, "Addon-only volume. Changes apply next cue; game audio settings still apply.", 2, -364, "GameFontHighlightSmall")
-    summary = label(window, "", 24, -555, "GameFontHighlightSmall")
-    detail = label(window, "", 24, -576, "GameFontHighlightSmall")
-    button(window, "Preview Weapon", 145, 24, -611, function() ns.Play(nil, true, "weapon") end)
-    button(window, "Preview Totem", 145, 178, -611, function() ns.Play(nil, true, "totem") end)
-    button(window, "Diagnostics", 115, 332, -611, ns.Status)
-    button(window, "Close", 90, 480, -611, function() window:Hide() end)
+    gapValue = label(playbackPanel, "", 466, -165)
+    label(playbackPanel, "0s plays every detected proc. Previews ignore this gap.", 18, -190, "GameFontHighlightSmall")
+    random = check(playbackPanel, "Random cue each proc", -4, -216, "randomSound")
+    preview = check(playbackPanel, "Preview on selection", 296, -216, "previewOnSelect")
+    button(playbackPanel, "Restore defaults", 145, 0, -263, ns.ResetOptions)
+    label(playbackPanel, "Resets sounds, volume and playback options.", 160, -269, "GameFontHighlightSmall")
+    label(diagnosticsPanel, "Session snapshot", 2, -5)
+    diagnosticsText = label(diagnosticsPanel, "", 2, -40, "GameFontHighlight")
+    button(diagnosticsPanel, "Refresh", 100, 0, -154, ns.RefreshOptions)
+    button(diagnosticsPanel, "Reset counters", 140, 110, -154, function() ns.ResetCounters(); ns.RefreshOptions() end)
+    button(diagnosticsPanel, "Print status", 120, 260, -154, ns.Status)
+    label(diagnosticsPanel, "Troubleshooting trace (30 seconds, public IDs only)", 2, -205, "GameFontHighlightSmall")
+    button(diagnosticsPanel, "Start trace", 120, 0, -234, ns.StartTrace)
+    button(diagnosticsPanel, "Show / stop", 120, 130, -234, ns.ShowTrace)
+    button(diagnosticsPanel, "Clear trace", 120, 260, -234, function()
+        ns.StopTrace(false); ns.trace=nil; ns.db.lastTrace=nil; ns.Print("Trace cleared.")
+    end)
+    label(window, "WEAPON CUE", 24, -471, "GameFontNormalSmall")
+    label(window, "TOTEM CUE", 338, -471, "GameFontNormalSmall")
+    weaponSummary = label(window, "", 24, -490, "GameFontHighlight")
+    totemSummary = label(window, "", 338, -490, "GameFontHighlight")
+    detail = label(window, "", 24, -519, "GameFontHighlightSmall")
+    button(window, "Stop sound", 96, 24, -555, ns.StopPlayback)
+    button(window, "Preview Weapon", 145, 130, -555, function() ns.Play(nil, true, "weapon") end)
+    button(window, "Preview Totem", 145, 285, -555, function() ns.Play(nil, true, "totem") end)
+    button(window, "Close", 84, 532, -555, function() window:Hide() end)
     UISpecialFrames[#UISpecialFrames + 1] = "WindfuryProcSoundOptions"
-    window:SetScript("OnShow", ns.RefreshOptions)
+    window:SetScript("OnShow", function() fitWindow(); ns.RefreshOptions() end)
     showTab("sounds"); window:Hide()
 end
 
