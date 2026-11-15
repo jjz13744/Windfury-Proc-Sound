@@ -2,7 +2,7 @@
 
 A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes wolf howl, chicken, and an original sci-fi blade cue.
 
-**Status: experimental, not yet tested inside the live game.** Automated Lua tests cover the event logic, settings, sound selection, and mocked UI. The current Forever API can restrict combat-event data. The addon skips restricted values and cannot promise a cue for every proc in every client build.
+**Status: 0.2.1 diagnostic build.** A live user report showed no detection on a Windfury proc. This update adds an opt-in event trace to investigate that failure; it does not claim to fix proc detection. Automated tests cover the Lua logic with mocked APIs, not actual combat-event delivery.
 
 ## Install on Windows
 
@@ -39,18 +39,21 @@ Commands:
 | `/wfps status` | Show event registration, readable/restricted candidate counts, proc count and playback failures |
 | `/wfps on` / `/wfps off` | Enable or disable automatic cues |
 | `/wfps reset` | Restore default options and clear session counters |
+| `/wfps trace on` | Capture up to 30 seconds of public diagnostic events |
+| `/wfps trace show` | Stop and show the latest trace summary |
+| `/wfps trace stop` / `/wfps trace clear` | Stop capture / remove the captured trace |
 
 Only one cue plays at a time. A new cue stops the preceding one to prevent audio stacking. Short sound previews can still be loud depending on your game volume.
 
 ## Proc detection
 
-The detector uses `UNIT_SPELLCAST_SUCCEEDED` registered for the player, plus newly added player `UNIT_AURA` entries as a fallback. Known proc IDs come from a current Forever-specific addon, GaleCount. Applying the weapon imbue or dropping the totem does **not** trigger a sound. Another unit's cast is ignored. The addon does not read the combat log or damage numbers.
+The detector uses `UNIT_SPELLCAST_SUCCEEDED` registered for the player, plus newly added player `UNIT_AURA` entries as a fallback. The configured legacy proc IDs came from GaleCount. They are not proof that Forever sends matching cast or aura events. Applying the weapon imbue or dropping the totem is excluded by these filters. Another unit's cast is ignored. The addon does not read the combat log or damage numbers.
 
 A 0.25-second matching window suppresses duplicate cast/aura notifications of the same proc. Distinct same-source notifications remain distinct. Since the game does not supply a common public identifier across both sources, extremely closely spaced incomplete event sequences can be ambiguous. Restricted values are discarded before comparison or table indexing. Full aura snapshots are not treated as new procs.
 
 No WeakAuras, GaleCount, or other addon is required. No hidden combat data is extracted or bypassed. No networking or telemetry is included.
 
-## In-game check still needed
+## Investigating missing proc sounds
 
 1. `/wfps test`: confirms installation and audio playback.
 2. On a character using Windfury Weapon, attack a target and compare observed procs with `/wfps status`.
@@ -58,7 +61,14 @@ No WeakAuras, GaleCount, or other addon is required. No hidden combat data is ex
 4. Repeat with Windfury Totem if desired.
 5. If previews work but no actual procs are detected, the current client may not expose the required public notifications. A successful preview does not validate proc detection.
 
-`/wfps status` reports counters only, not character information. It does not log private combat payloads. Report client version and these counters when diagnosing compatibility.
+For a short diagnostic capture:
+
+1. Run `/wfps trace on`, then attack until you see a Windfury proc.
+2. Run `/wfps trace show` promptly. Capture stops automatically after 30 seconds.
+3. Share the summary and whether you observed your own proc. Separately test with another player proccing while you do not attack.
+4. `/reload` or normal logout saves the trace with addon settings. Do this when convenient, outside combat. `/wfps trace clear` removes it.
+
+The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Cooldown events are **diagnostic only** and cannot play a sound. The observed candidate `439440, nil, 0, 0, nil` requires live ownership and completeness checks before it can be used as a trigger. See `SOURCES.md`.
 
 ## Sound rights and provenance
 
@@ -67,7 +77,7 @@ The bundled sci-fi blade is an **original synthesized sound**, not the exact aud
 ## Development
 
 - `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.2.0.zip`.
+- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.2.1.zip`.
 - Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
 - `ffmpeg`/`ffprobe` can verify that all bundled OGG files decode successfully.
 

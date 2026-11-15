@@ -20,12 +20,15 @@ assert len(re.findall(r'id\s*=', (addon / 'Sounds.lua').read_text())) == 21
 assert (addon / 'SOUND_CREDITS.md').is_file()
 for name in ['README.md', 'LICENSE']:
     (addon / name).write_bytes((root / name).read_bytes())
-out = root / 'dist' / 'WindfuryProcSound-0.2.0.zip'
+version = re.search(r'^## Version: ([0-9.]+)$', (addon / 'WindfuryProcSound.toc').read_text(), re.M).group(1)
+for toc in addon.glob('*.toc'):
+    assert f'## Version: {version}' in toc.read_text().splitlines()
+out = root / 'dist' / f'WindfuryProcSound-{version}.zip' 
 out.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
     for file in sorted(addon.rglob('*')):
         if file.is_file():
-            info = zipfile.ZipInfo(file.relative_to(root).as_posix(), (2026, 11, 14, 0, 0, 0))
+            info = zipfile.ZipInfo(file.relative_to(root).as_posix(), (2026, 11, 15, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             archive.writestr(info, file.read_bytes())

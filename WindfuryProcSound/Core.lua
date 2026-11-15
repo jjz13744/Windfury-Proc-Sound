@@ -3,7 +3,7 @@ local Core = {}
 ns.Core = Core
 
 -- Proc spells, NOT the casts that apply the weapon imbue or place the totem.
--- Verified against GaleCount's published Forever source; see SOURCES.md.
+-- Sourced from GaleCount; actual Forever event delivery is unverified. See SOURCES.md.
 Core.procIDs = {
     [8233] = "weapon", [8236] = "weapon", [10484] = "weapon", [16361] = "weapon",
     [8516] = "totem", [10608] = "totem", [10610] = "totem",
@@ -68,4 +68,54 @@ function Core.NewDetector(emit)
         self.events = {}; self.count = 0; self.restricted = 0; self.readable = 0
     end
     return self
+end
+
+-- Opt-in diagnostics contain only public numeric spell/category IDs and timing.
+-- No character names, GUIDs, damage values, or secret payload values are stored.
+Core.traceLimit = 120
+function Core.TraceValue(value)
+    if Core.IsSecret(value) then return "restricted" end
+    if value == nil then return "nil" end
+    if type(value) == "number" and value == value and value > -math.huge and value < math.huge then return value end
+    return "other"
+end
+
+function Core.NewTrace(now)
+    return { active = true, started = now, expires = now + 30, rows = {}, total = 0, dropped = 0 }
+end
+
+function Core.TraceRecord(trace, source, spellID, now, baseSpellID, category, startRecoveryCategory, itemID)
+    if not trace or not trace.active then return end
+    trace.total = trace.total + 1
+    if #trace.rows >= Core.traceLimit then table.remove(trace.rows, 1); trace.dropped = trace.dropped + 1 end
+    local row = { source = source, t = math.floor((now - trace.started) * 1000 + 0.5) / 1000, spellID = Core.TraceValue(spellID) }
+    if source == "cooldown" then
+        row.baseSpellID = Core.TraceValue(baseSpellID)
+        row.category = Core.TraceValue(category)
+        row.startRecoveryCategory = Core.TraceValue(startRecoveryCategory)
+        row.itemID = Core.TraceValue(itemID)
+    end
+    trace.rows[#trace.rows + 1] = row
+end
+
+function Core.CopyTrace(saved)
+    if type(saved) ~= "table" or type(saved.rows) ~= "table" then return nil end
+    local copy = { active = false, rows = {}, total = tonumber(saved.total) or 0, dropped = tonumber(saved.dropped) or 0 }
+    local sources = { cast = true, aura = true, ["aura-update"] = true, cooldown = true }
+    local function field(v)
+        if type(v) == "number" and v == v and v > -math.huge and v < math.huge then return v end
+        if v == "nil" or v == "restricted" or v == "other" then return v end
+        return "other"
+    end
+    for i = 1, math.min(#saved.rows, Core.traceLimit) do
+        local row = saved.rows[i]
+        if type(row) == "table" and type(row.source) == "string" and sources[row.source] then
+            local out = { source = row.source, t = type(row.t) == "number" and row.t or 0, spellID = field(row.spellID) }
+            if row.source == "cooldown" then
+                for _, k in ipairs({ "baseSpellID", "category", "startRecoveryCategory", "itemID" }) do out[k] = field(row[k]) end
+            end
+            copy.rows[#copy.rows + 1] = out
+        end
+    end
+    return copy
 end

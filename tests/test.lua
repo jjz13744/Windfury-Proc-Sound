@@ -126,6 +126,55 @@ PlaySoundFile=function() return false end
 check(not ns.Play(nil,true) and ns.soundFailures==1, "playback failure reported")
 SlashCmdList.WINDFURYPROCSOUND("reset")
 check(ns.soundFailures == 0, "reset playback failure counter")
+-- Diagnostics: bounded public IDs only; cooldown candidates never trigger audio.
+local tr = C.NewTrace(200)
+C.TraceRecord(tr, "cooldown", secret, 200.25, nil, secret, 0, secret)
+check(tr.rows[1].spellID == "restricted" and tr.rows[1].category == "restricted", "trace discards secret values")
+check(tr.rows[1].baseSpellID == "nil" and tr.rows[1].startRecoveryCategory == 0, "trace preserves nil vs zero")
+check(tr.rows[1].itemID == "restricted" and tr.rows[1].t == 0.25, "trace stores only markers and relative timing")
+for i=1,130 do C.TraceRecord(tr,"cast",i,201+i/10) end
+check(#tr.rows == 120 and tr.dropped == 11 and tr.total == 131, "trace bounded to latest 120 rows")
+check(tr.rows[1].spellID == 11 and tr.rows[120].spellID == 130, "trace retains latest entries")
+local restored=C.CopyTrace(tr)
+check(restored and not restored.active and #restored.rows == 120, "saved trace restored inactive")
+check(C.CopyTrace({rows="bad"}) == nil, "invalid saved trace rejected")
+clock=300
+SlashCmdList.WINDFURYPROCSOUND("trace on")
+check(ns.trace.active and ns.frame.registered.SPELL_UPDATE_COOLDOWN, "trace subscribes cooldown event")
+local procBefore, failuresBefore = ns.detector.count, ns.soundFailures
+event(ns.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+check(ns.trace.rows[1].spellID == 439440 and ns.trace.rows[1].category == 0, "observed cooldown signature recorded")
+check(ns.detector.count == procBefore and ns.soundFailures == failuresBefore, "cooldown candidate cannot trigger sound")
+event(ns.frame,"UNIT_SPELLCAST_SUCCEEDED","player","never-stored-guid",12345)
+check(ns.trace.rows[2].source == "cast" and ns.trace.rows[2].spellID == 12345, "readable player cast recorded without GUID")
+C_UnitAuras={GetAuraDataByAuraInstanceID=function(unit,id) return {spellId=439441} end}
+event(ns.frame,"UNIT_AURA","player",{updatedAuraInstanceIDs={17}})
+check(ns.trace.rows[3].source == "aura-update" and ns.trace.rows[3].spellID == 439441, "updated aura traced without counting as proc")
+check(ns.detector.count == procBefore, "aura refresh trace does not become proc")
+SlashCmdList.WINDFURYPROCSOUND("trace show")
+check(not ns.trace.active and not ns.frame.registered.SPELL_UPDATE_COOLDOWN, "show stops trace and unregisters cooldown")
+check(ns.db.lastTrace == ns.trace, "trace retained in existing saved settings")
+SlashCmdList.WINDFURYPROCSOUND("trace on")
+clock=331
+ns.frame.scripts.OnUpdate()
+check(not ns.trace.active and ns.frame.scripts.OnUpdate == nil, "trace automatically ends after 30 seconds")
+SlashCmdList.WINDFURYPROCSOUND("trace clear")
+check(ns.trace == nil and ns.db.lastTrace == nil, "clear removes diagnostic record")
+-- Optional trace-field restrictions must not abort readable added-aura handling.
+local guarded=setmetatable({addedAuras={{spellId=8233,auraInstanceID=200}}}, {
+    __index=function(_,key) if key=="updatedAuraInstanceIDs" then error("restricted diagnostic field") end end
+})
+clock=400
+local addedBefore=ns.detector.count
+event(ns.frame,"UNIT_AURA","player",guarded)
+check(ns.detector.count==addedBefore+1, "trace-off never reads optional updated-aura field")
+SlashCmdList.WINDFURYPROCSOUND("trace on")
+clock=401; guarded.addedAuras[1].auraInstanceID=201
+event(ns.frame,"UNIT_AURA","player",guarded)
+check(ns.detector.count==addedBefore+2, "trace restriction cannot abort readable added-aura detection")
+SlashCmdList.WINDFURYPROCSOUND("trace clear")
+C_UnitAuras=nil
+
 -- Rename migration: import only when no new-format settings exist, avoid double audio.
 local renamed = {}
 assert(loadfile("WindfuryProcSound/Core.lua"))("WindfuryProcSound", renamed)

@@ -40,6 +40,7 @@ end
 ns.detector = Core.NewDetector(function() ns.Play() end)
 
 local function observe(spellID, source, token)
+    Core.TraceRecord(ns.trace, source, spellID, GetTime())
     if ns.legacyActive then return end
     ns.detector:Observe(spellID, source, token, GetTime(), ns.db)
 end
@@ -56,6 +57,23 @@ local function onAura(unit, updateInfo)
     -- Full snapshots can contain old proc auras: do not treat them as new procs.
     local full = updateInfo.isFullUpdate
     if Core.IsSecret(full) or full then return end
+    -- Trace-only reads must not interfere with the existing added-aura route.
+    if ns.trace and ns.trace.active then
+        pcall(function()
+            local updated = updateInfo.updatedAuraInstanceIDs
+            if not Core.IsSecret(updated) and type(updated) == "table"
+                and C_UnitAuras and type(C_UnitAuras.GetAuraDataByAuraInstanceID) == "function" then
+                for _, id in ipairs(updated) do
+                    if not Core.IsSecret(id) and type(id) == "number" then
+                        local ok, aura = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", id)
+                        if ok and not Core.IsSecret(aura) and type(aura) == "table" then
+                            Core.TraceRecord(ns.trace, "aura-update", aura.spellId, GetTime())
+                        end
+                    end
+                end
+            end
+        end)
+    end
     local added = updateInfo.addedAuras
     if Core.IsSecret(added) then ns.detector.restricted = ns.detector.restricted + 1; return end
     if type(added) ~= "table" then return end
@@ -78,9 +96,54 @@ local function legacyLoaded()
     return ok and loaded == true
 end
 
+function ns.StopTrace(announce)
+    if ns.trace then ns.trace.active = false end
+    frame:SetScript("OnUpdate", nil)
+    frame:UnregisterEvent("SPELL_UPDATE_COOLDOWN")
+    if announce then ns.Print("Trace stopped. Use /wfps trace show to view it, then /reload when convenient to save it.") end
+end
+
+function ns.StartTrace()
+    ns.StopTrace(false)
+    ns.trace = Core.NewTrace(GetTime())
+    ns.db.lastTrace = ns.trace
+    local ok, result = pcall(frame.RegisterEvent, frame, "SPELL_UPDATE_COOLDOWN")
+    ns.trace.cooldownRegistered = ok and result ~= false
+    frame:SetScript("OnUpdate", function()
+        if ns.trace and ns.trace.active and GetTime() >= ns.trace.expires then ns.StopTrace(true) end
+    end)
+    ns.Print("30-second diagnostic trace started. Trigger one Windfury proc, then /wfps trace show. This does not change sound triggers.")
+    if not ns.trace.cooldownRegistered then ns.Print("Cooldown event unavailable; tracing readable player casts and auras only.") end
+end
+
+function ns.ShowTrace()
+    ns.StopTrace(false)
+    local trace = ns.trace
+    if not trace then ns.Print("No trace yet. Use /wfps trace on."); return end
+    ns.Print("Trace: " .. #trace.rows .. " rows, " .. trace.total .. " events, " .. trace.dropped .. " rows omitted. Cooldown rows are diagnostic only.")
+    local grouped, order = {}, {}
+    for _, row in ipairs(trace.rows) do
+        local key = row.source .. " id=" .. tostring(row.spellID)
+        if row.source == "cooldown" then
+            key = key .. " base=" .. tostring(row.baseSpellID) .. " category=" .. tostring(row.category)
+                .. " recovery=" .. tostring(row.startRecoveryCategory) .. " item=" .. tostring(row.itemID)
+        end
+        if not grouped[key] then grouped[key] = 0; order[#order + 1] = key end
+        grouped[key] = grouped[key] + 1
+    end
+    table.sort(order, function(a,b)
+        local ac, bc = a:find("id=439440", 1, true) ~= nil, b:find("id=439440", 1, true) ~= nil
+        if ac ~= bc then return ac end
+        return a < b
+    end)
+    for i = 1, math.min(15, #order) do local key = order[i]; ns.Print(key .. " x" .. grouped[key]) end
+    if #order > 15 then ns.Print("More groups are saved in the trace. /reload when convenient saves all captured rows.") end
+end
+
 function ns.Status()
     local d = ns.detector
     if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
+    ns.Print("Version 0.2.1 diagnostics; cast/aura-only trigger. Cooldown trace never plays a sound.")
     ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.GetSound(ns.db.sound).name .. "; " .. ns.db.channel .. " channel.")
     ns.Print("This session: " .. d.count .. " detected procs, " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures.")
     ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ". Live Forever validation is still needed.")
@@ -91,7 +154,10 @@ frame:SetScript("OnEvent", function(_, event, ...)
         local name = ...
         if name ~= ADDON then return end
         local migrating = type(WindfuryProcSoundDB) ~= "table" and type(WindfurySaberDB) == "table"
-        ns.db = Core.Settings(migrating and WindfurySaberDB or WindfuryProcSoundDB, ns.sounds)
+        local previous = migrating and WindfurySaberDB or WindfuryProcSoundDB
+        ns.db = Core.Settings(previous, ns.sounds)
+        ns.trace = Core.CopyTrace(type(previous) == "table" and previous.lastTrace or nil)
+        ns.db.lastTrace = ns.trace
         WindfuryProcSoundDB = ns.db
         ns.legacyActive = legacyLoaded()
         if migrating then ns.Print("Previous options imported into Windfury Proc Sound.") end
@@ -104,6 +170,9 @@ frame:SetScript("OnEvent", function(_, event, ...)
         frame:UnregisterEvent("ADDON_LOADED")
     elseif ready and event == "PLAYER_ENTERING_WORLD" then
         ns.detector.events = {}
+    elseif ready and event == "SPELL_UPDATE_COOLDOWN" then
+        local spellID, baseSpellID, category, startRecoveryCategory, itemID = ...
+        Core.TraceRecord(ns.trace, "cooldown", spellID, GetTime(), baseSpellID, category, startRecoveryCategory, itemID)
     elseif ready and event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, castGUID, spellID = ...
         if playerUnit(unit) then observe(spellID, "cast", castGUID) end
@@ -126,6 +195,13 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
     cmd = cmd:lower()
     if cmd == "test" then ns.Play(nil, true)
     elseif cmd == "status" then ns.Status()
+    elseif cmd == "trace" then
+        arg = arg:lower()
+        if arg == "on" or arg == "start" then ns.StartTrace()
+        elseif arg == "off" or arg == "stop" then ns.StopTrace(true)
+        elseif arg == "clear" then ns.StopTrace(false); ns.trace = nil; ns.db.lastTrace = nil; ns.Print("Trace cleared.")
+        elseif arg == "" or arg == "show" then ns.ShowTrace()
+        else ns.Print("/wfps trace on, show, stop, clear") end
     elseif cmd == "on" or cmd == "off" then
         ns.db.enabled = cmd == "on"; ns.detector.events = {}; ns.Status()
         if ns.RefreshOptions then ns.RefreshOptions() end
@@ -137,10 +213,11 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
         if found then ns.db.sound = found.id; ns.Play(nil, true); if ns.RefreshOptions then ns.RefreshOptions() end
         else ns.Print("Use /wfps to choose one of the " .. #ns.sounds .. " sounds, or /wfps sound NUMBER (1-" .. #ns.sounds .. ").") end
     elseif cmd == "reset" then
+        ns.StopTrace(false); ns.trace = nil
         ns.db = Core.Settings({}, ns.sounds); WindfuryProcSoundDB = ns.db; ns.detector:Reset()
         ns.soundFailures = 0; unavailableWarned = false
         if ns.RefreshOptions then ns.RefreshOptions() end
         ns.Print("Options and session counters reset.")
     elseif cmd == "" or cmd == "options" then ns.ShowOptions()
-    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", status, on, off, reset") end
+    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", status, trace on|show|stop|clear, on, off, reset") end
 end

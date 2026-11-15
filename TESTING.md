@@ -1,25 +1,21 @@
 # Verification report
 
-2026-11-14, version 0.2.0
+2026-11-15, version 0.2.1 diagnostic build
 
 Passed locally:
-- 118 assertions in Lua 5.4, using WoW-compatible Lua syntax and mocked WoW APIs.
-- All seven known proc IDs; no cue for applying Windfury Weapon or placing its totem.
-- Only player events; independent weapon/totem settings; disabled state.
-- Cast/aura duplicate suppression in either arrival order, token duplicates, and rapid distinct casts.
-- Secret-marker values skipped in spell IDs, unit tokens, cast tokens and aura arrays; full aura snapshots ignored.
-- All 21 unique catalog entries and audio files, saved-option normalization, selection, preview, reset and status.
-- Mocked options-window open and registration, sound failure reporting and counter reset.
-- The 21st option has its own non-overlapping button; window grows for 11 rows.
-- Product/folder/TOC/commands renamed; legacy settings import when available; new settings take precedence; automatic cues pause while legacy addon runs to avoid duplicates.
-- LightsaberCrit proc selected by number and ID and plays the exact expected filename.
-- All 21 OGGs decode with ffmpeg; source manifests verify their hashes.
-- ZIP integrity, both TOCs, all referenced Lua files and exact one-folder install layout.
-- Independent static review of detection, secret guards and UI. Its reset-counter finding was fixed and regression tested.
+- 137 assertions using Lua 5.4 and mocked WoW APIs.
+- Original settings, all 21 sound files, selection, preview, disabled state, options layout, rename migration and cast/aura filtering regressions.
+- Opt-in 30-second trace; last 120 rows retained; old rows counted as omitted.
+- Secret values replaced with markers before comparison, serialization or display; nil and zero kept distinct.
+- Cooldown signature 439440, nil, 0, 0, nil recorded with all five fields but never counted as a proc or used for playback.
+- Readable updated-aura spell IDs are diagnostic only; neither updates nor diagnostic read failures change normal added-aura processing.
+- Trace stops/unregisters its cooldown event on show, stop and timeout; clear/reset remove it.
+- Saved trace normalization restores inactive; names, cast GUIDs and damage are not stored.
+- Independent review found an optional trace field could interrupt added-aura processing. It was isolated and covered by two regression tests.
+- ZIP integrity, both Interface 16001 manifests, exact single-folder layout and all referenced Lua/audio files.
 
-Not tested:
-- No live WoW Forever client was available. Actual proc notifications, secret-value semantics and native UI layout/templates remain unverified.
-- No end-to-end Windows installation was performed; the user's desktop was not changed.
-- No hosted CI workflow was added or run.
-
-The original Wago page was unreadable during research. Its exact audio and trigger are not verified. Version 0.2.0 includes the separate LightsaberCrit OGG at owner request; audio-specific license coverage remains unverified. See README and sound credits for the replacement audio's provenance.
+Live evidence and remaining limits:
+- The installed 0.2.0 files were verified against the release ZIP on Windows. The user's screenshot showed 0 detected procs, 22 readable candidates and no playback failures after a reported proc.
+- Version 0.2.1 adds diagnostics, not a confirmed detection fix. The cooldown candidate requires own-proc comparison and an other-player negative test. No in-game trace from this build has been reviewed yet.
+- Mock secret markers are not Blizzard's actual restricted-value engine. Event delivery and native UI remain outside the local test environment.
+- No hosted CI workflow exists or ran.

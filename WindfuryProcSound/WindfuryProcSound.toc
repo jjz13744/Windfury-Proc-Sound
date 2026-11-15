@@ -2,11 +2,11 @@
 ## Title: Windfury Proc Sound
 ## Notes: Twenty-one selectable sound cues for readable player Windfury proc events in WoW Forever.
 ## Author: Jared Zengo
-## Version: 0.2.0
+## Version: 0.2.1
 ## SavedVariables: WindfuryProcSoundDB, WindfurySaberDB
 ## OptionalDeps: WindfurySaber
 ## X-Category: Audio & Video
-## X-Compatibility: WoW Forever; live proc validation pending
+## X-Compatibility: WoW Forever; diagnostic build, proc detection unverified
 Sounds.lua
 Core.lua
 Addon.lua
