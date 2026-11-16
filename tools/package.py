@@ -13,26 +13,27 @@ for toc in addon.glob('*.toc'):
     for line in lines:
         if line and not line.startswith('#'):
             assert (addon / line).is_file(), f'Missing {line}'
+catalog = json.loads((addon / 'sound-catalog.json').read_text())
+custom = [item for item in catalog if item.get('file')]
 audio = list((addon / 'sounds').glob('*.ogg'))
-assert len(audio) == 20, f'Expected 20 custom originals, got {len(audio)}'
+assert {path.name for path in audio} == {item['file'] for item in custom}
 for file in audio:
     assert file.read_bytes().startswith(b'OggS'), file
-assert len(re.findall(r'id\s*=', (addon / 'Sounds.lua').read_text())) == 21
+assert re.findall(r'id\s*=\s*"([^"]+)"', (addon / 'Sounds.lua').read_text()) == [item['id'] for item in catalog]
 assert (addon / 'SOUND_CREDITS.md').is_file()
 manifest = json.loads((addon / 'volume_manifest.json').read_text())
-assert manifest['summary']['passed'] and len(manifest['originals']) == 20 and len(manifest['variants']) == 180
+assert manifest['summary']['passed'] and len(manifest['originals']) == len(custom) and len(manifest['variants']) == 9 * len(custom)
 expected_audio = set()
 for entry in manifest['originals'] + manifest['variants']:
     path = addon / entry['path']
     expected_audio.add(path)
     assert path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == entry['sha256'], path
 assert set((addon / 'sounds').rglob('*.ogg')) == expected_audio
-catalog = json.loads((addon / 'sound-catalog.json').read_text())
-assert len(catalog) == 21
-assert sum('file' in item for item in catalog) == 20
+for item in custom:
+    assert hashlib.sha256((addon / 'sounds' / item['file']).read_bytes()).hexdigest() == item['sha256']
 assert sum(item.get('kind') == 'native_sound_kit' for item in catalog) == 1
 assert 'wolf_howl.ogg' not in (addon / 'Sounds.lua').read_text()
-for name in ['README.md', 'LICENSE']:
+for name in ['README.md', 'CHANGELOG.md', 'LICENSE']:
     (addon / name).write_bytes((root / name).read_bytes())
 version = re.search(r'^## Version: ([0-9.]+)$', (addon / 'WindfuryProcSound.toc').read_text(), re.M).group(1)
 for toc in addon.glob('*.toc'):

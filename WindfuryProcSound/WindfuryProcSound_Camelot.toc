@@ -1,8 +1,8 @@
 ## Interface: 16001
-## Title: Windfury Proc Sound
-## Notes: Windfury proc cues with addon-only volume, separate Weapon/Totem sounds, and playback options.
+## Title: Windfury/Extra Hit Proc Sound
+## Notes: Windfury cues, experimental item/Sword extra-hit sounds, addon volume, and fractional duration limits.
 ## Author: Jared Zengo
-## Version: 0.3.2
+## Version: 0.6.1
 ## SavedVariables: WindfuryProcSoundDB, WindfurySaberDB
 ## OptionalDeps: WindfurySaber
 ## X-Category: Audio & Video

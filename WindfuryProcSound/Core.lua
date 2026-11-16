@@ -8,9 +8,20 @@ Core.procIDs = {
     [439440] = "weapon", [8233] = "weapon", [8236] = "weapon", [10484] = "weapon", [16361] = "weapon",
     [8516] = "totem", [10608] = "totem", [10610] = "totem",
 }
+-- Triggered Add Extra Attacks spells from Forever DB2 build 1.60.1.70938.
+-- Passive/application spells (e.g. Hand of Justice 15600) are excluded.
+-- The spell identities are data-backed; public event delivery is unverified.
+Core.extraProcIDs = {
+    [1257049] = "Weaponmaster (Sword)",
+    [15601] = "Hand of Justice",
+    [18797] = "Flurry Axe",
+    [21919] = "Thrash Blade",
+}
+for id in pairs(Core.extraProcIDs) do Core.procIDs[id] = "extra" end
 Core.defaults = {
-    enabled = true, weapon = true, totem = true, sound = "lightsaber", channel = "Master",
+    enabled = true, weapon = true, totem = true, extra = false, sound = "lightsabercrit_proc", channel = "Master",
     volume = 100, minGap = 0, randomSound = false, previewOnSelect = false,
+    maxDuration = 0,
 }
 Core.window = 0.25
 
@@ -40,13 +51,14 @@ function Core.Settings(saved, catalog)
     local valid = false
     for _, sound in ipairs(catalog) do if sound.id == out.sound then valid = true end end
     if not valid then out.sound = Core.defaults.sound end
-    for _, kind in ipairs({"weapon", "totem"}) do
+    for _, kind in ipairs({"weapon", "totem", "extra"}) do
         local key = kind .. "Sound"
         out[key] = out.sound
         for _, sound in ipairs(catalog) do if sound.id == saved[key] then out[key] = sound.id end end
     end
     out.volume = Core.Snap(out.volume, 0, 100, 10, Core.defaults.volume)
     out.minGap = Core.Snap(out.minGap, 0, 2, 0.1, Core.defaults.minGap)
+    out.maxDuration = Core.Snap(out.maxDuration, 0, 30, 0.1, Core.defaults.maxDuration)
     return out
 end
 
@@ -59,11 +71,14 @@ function Core.MatchCooldown(spellID, baseSpellID, category, recovery, itemID)
     if spellID == 439440 and category == 0 then return "weapon", false end
     -- Rank 1 was observed independently; higher ranks share the proc family.
     if (spellID == 8516 or spellID == 10608 or spellID == 10610) and category == 2619 then return "totem", false end
+    -- Candidate only: the zero-category event shape is inferred, not observed.
+    -- Other extra hits are opt-in; only Weaponmaster is warrior-gated.
+    if type(spellID) == "number" and Core.extraProcIDs[spellID] and category == 0 then return "extra", false end
     return nil, false
 end
 
 function Core.NewDetector(emit)
-    local self = { events = {}, count = 0, weapon = 0, totem = 0, restricted = 0, readable = 0 }
+    local self = { events = {}, count = 0, weapon = 0, totem = 0, extra = 0, restricted = 0, readable = 0 }
     function self:Observe(spellID, source, token, now, settings)
         if Core.IsSecret(spellID) then self.restricted = self.restricted + 1; return false end
         if type(spellID) ~= "number" then return false end
@@ -76,8 +91,11 @@ function Core.NewDetector(emit)
         if type(token) ~= "string" and type(token) ~= "number" then token = nil end
         -- A current cooldown signal and legacy cast/aura ID can describe the
         -- same weapon proc. Match across sources by kind, not spell rank.
-        local records = self.events[kind] or {}
-        self.events[kind] = records
+        -- Different item/talent extra attacks can occur together. They share
+        -- a sound choice, but must never deduplicate one another.
+        local eventKey = kind == "extra" and spellID or kind
+        local records = self.events[eventKey] or {}
+        self.events[eventKey] = records
         -- Only match the same proc across two event sources. Distinct rapid casts
         -- from the same source remain distinct, unlike a blanket audio throttle.
         for i = #records, 1, -1 do
@@ -102,7 +120,7 @@ function Core.NewDetector(emit)
         return true
     end
     function self:Reset()
-        self.events = {}; self.count = 0; self.weapon = 0; self.totem = 0; self.restricted = 0; self.readable = 0
+        self.events = {}; self.count = 0; self.weapon = 0; self.totem = 0; self.extra = 0; self.restricted = 0; self.readable = 0
     end
     return self
 end

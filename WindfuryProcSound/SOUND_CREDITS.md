@@ -1,3 +1,12 @@
+Audio expansion, version 0.4.0
+-----------------------------
+The new general effects are credited individually in EXPANSION_CREDITS.md.
+The requested CritSound and WFGoWhoosh recordings are documented separately
+in LEGACY_AUDIO_PROVENANCE.md; they are not part of the cleared CC0/BY set.
+This version preserves every original 0.3.2 sound file and volume variant.
+The 17 older digital cues remain bundled for saved selections but are retired
+from the standard dropdown categories and random playback.
+
 Bundled Audio Credits and Provenance
 ====================================
 Updated 2026-11-15. Nineteen custom cues are mono Vorbis at 44,100 Hz.
@@ -107,3 +116,53 @@ Leading-silence cleanup (version 0.3.1)
    Changed originals are re-encoded at Vorbis quality 10; quieter variants are
    rebuilt. See sound-catalog.json for per-file trim amounts and source hashes.
    The native Warcraft wolf sound cannot be edited by this addon.
+
+
+0.4.1-based update: new clips and conservative silence cleanup
+===========================================================
+The complete 0.4.1 sound library, ordering, categories, retired choices and
+license/provenance files are retained. The two new user-requested clips below
+are appended after the 64 original catalog entries, without renumbering them.
+
+6. Bonk (bonk.ogg), requested 2026-11-16
+   "Bonk Sound Effect" by Mr. Sound Effects.
+   https://www.youtube.com/watch?v=6TP0abZdRXg
+   Source description: "Bonk". No explicit asset license was supplied.
+
+7. Fruit machine payout (fruit_machine.ogg), requested 2026-11-16
+   "Fruit machine payout sound effect casino & arcade funfair sounds"
+   by Sound laboratory.
+   https://www.youtube.com/watch?v=NDqVyfjcckI
+   The creator's description invites downloads via converter. It does not
+   establish a redistribution license. Rights remain unverified for both new
+   uploads; neither is claimed to be CC0 or covered by the code license.
+
+Processing / current metadata:
+   The two new clips retain the previously reviewed requested-build processing:
+   mono 44.1 kHz Vorbis quality 10, attenuation only where needed, no amplification.
+   Bonk had 168.685 ms leading and 300.408 ms trailing near-silence removed;
+   Fruit machine payout had 686.213 ms leading near-silence removed. Their
+   current lengths are approximately 0.402 and 3.702 seconds, respectively.
+   No progressive re-trimming or extra re-encode was applied to these two files.
+
+   All 65 custom originals were checked against an immutable 0.4.1-based archive.
+   Seventeen baseline files had 1,671.791 ms of additional trailing near-silence
+   removed in total, at -60 dBFS with >=5 ms padding around audible samples.
+   Audible attacks/decay, interior pauses, gain, channels and sample rate were
+   preserved. Changed outputs retain exactly the planned decoded frame counts.
+   Forty-six of the 63 baseline originals remain byte-identical to 0.4.1.
+   Native Warcraft audio remains game-owned and unmodified.
+
+   Explosion blast and Whip crack were intentionally left byte-identical:
+   even a quality-10 Vorbis re-encode failed the strict >=35 dB waveform-SNR
+   guard. Their remaining candidate tail padding is 39.637 and 40.839 ms.
+   The threshold was not relaxed to force a trim. Their skip reasons and
+   candidate waveform measurements are retained in the catalog.
+
+   All 585 quieter variants are validated; 414 existing variants were reused
+   unchanged when both source and output hashes matched the 0.4.1 manifest.
+   Existing EXPANSION_CREDITS.md, LEGACY_AUDIO_PROVENANCE.md and
+   expansion_manifest.json remain exact 0.4.1 source/provenance records.
+   For CURRENT processed file sizes, hashes and durations, use sound-catalog.json
+   and volume_manifest.json; older hashes in source/provenance notes describe
+   earlier revisions. Asset rights and attribution are unchanged by processing.

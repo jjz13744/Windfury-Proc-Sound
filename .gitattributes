@@ -1,0 +1,7 @@
+# Preserve the supplied release's license and provenance files byte-for-byte.
+LICENSE -text
+WindfuryProcSound/LICENSE -text
+WindfuryProcSound/LICENSE-*.txt -text -whitespace
+WindfuryProcSound/EXPANSION_CREDITS.md -text
+WindfuryProcSound/LEGACY_AUDIO_PROVENANCE.md -text
+WindfuryProcSound/expansion_manifest.json -text

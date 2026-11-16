@@ -7,11 +7,11 @@ local secret = {}
 issecretvalue = function(v) return rawequal(v, secret) end
 assert(loadfile("WindfuryProcSound/Core.lua"))("WindfuryProcSound", ns)
 local C = ns.Core
-local catalog = {{id="lightsaber"}, {id="wolf"}}
+local catalog = {{id="lightsabercrit_proc"}, {id="lightsaber"}, {id="wolf"}}
 local db = C.Settings(nil, catalog)
-check(db.enabled and db.weapon and db.totem and db.sound == "lightsaber", "defaults")
+check(db.enabled and db.weapon and db.totem and db.sound == "lightsabercrit_proc", "0.4.1 default cue preserved")
 local corrupt = C.Settings({enabled="yes", channel="Bad", sound="missing"}, catalog)
-check(corrupt.enabled and corrupt.channel == "Master" and corrupt.sound == "lightsaber", "repair settings")
+check(corrupt.enabled and corrupt.channel == "Master" and corrupt.sound == "lightsabercrit_proc", "repair settings preserves 0.4.1 default")
 local count = 0
 local d = C.NewDetector(function() count = count + 1 end)
 check(d:Observe(8233, "cast", "a", 1, db), "weapon proc")
@@ -32,7 +32,9 @@ check(not d:Observe(10608, "cast", "t", 5, db), "totem disabled")
 db.enabled = false
 check(not d:Observe(8236, "cast", "e", 5, db), "disabled")
 db.enabled = true; db.totem = true
+db.extra = true
 for id in pairs(C.procIDs) do check(d:Observe(id, "cast", "rank" .. id, 10, db), "rank " .. id) end
+db.extra = false
 d:Reset(); check(d.count == 0 and d.restricted == 0, "reset")
 
 -- Lightweight WoW API mocks: execute the actual addon event handlers and options.
@@ -46,6 +48,7 @@ local function widget()
     function f:RegisterUnitEvent(e, u) self.registered[e] = u end
     function f:CreateFontString() return widget() end
     function f:SetText(v) self.textValue = v end
+    function f:GetText() return self.textValue end
     function f:SetPoint(...) self.point = {...} end
     function f:SetSize(w,h) self.width=w; self.height=h end
     function f:SetScale(v) self.scale=v end
@@ -56,13 +59,15 @@ local function widget()
     function f:SetValueStep(v) self.step=v end
     function f:GetChecked() return self.checked end
     function f:Show() self.shown=true; if self.scripts.OnShow then self.scripts.OnShow(self) end end
-    function f:Hide() self.shown=false end
+    function f:Hide() self.shown=false; if self.scripts.OnHide then self.scripts.OnHide(self) end end
     local noOp = function() end
-    for _, n in ipairs({"SetOrientation", "SetObeyStepOnDrag", "SetThumbTexture", "SetFrameStrata", "SetClampedToScreen", "EnableMouse", "SetMovable", "RegisterForDrag", "SetBackdrop", "SetEnabled", "StartMoving", "StopMovingOrSizing"}) do f[n] = noOp end
+    for _, n in ipairs({"SetOrientation", "SetObeyStepOnDrag", "SetThumbTexture", "SetFrameStrata", "SetClampedToScreen", "EnableMouse", "SetMovable", "RegisterForDrag", "SetBackdrop", "SetEnabled", "StartMoving", "StopMovingOrSizing", "SetAutoFocus", "SetMaxLetters", "ClearFocus"}) do f[n] = noOp end
     return f
 end
-CreateFrame = function(_, name)
+CreateFrame = function(_, name, parent, template)
     local f=widget(); f.text=widget(); frames[#frames+1]=f
+    f.parent=parent
+    if template=="UIDropDownMenuTemplate" then f.Button=widget() end
     if name then _G[name]=f end
     return f
 end
@@ -76,8 +81,47 @@ end}
 GetTime=function() return clock end
 SlashCmdList={}; UISpecialFrames={}; UIParent={}
 Settings={ RegisterCanvasLayoutCategory=function() return {} end, RegisterAddOnCategory=function() end }
+local dropdown, menuClosed = nil, 0
+UIDropDownMenu_SetWidth=function(menu,width) menu.width=width end
+UIDropDownMenu_SetAnchor=function(menu,...) menu.anchor={...} end
+UIDropDownMenu_Initialize=function(menu,initialize) menu.initialize=initialize end
+UIDropDownMenu_CreateInfo=function() return {} end
+UIDropDownMenu_AddButton=function(info,level)
+    assert(dropdown,"dropdown must be open before adding buttons")
+    dropdown.buttons[#dropdown.buttons+1]=info
+end
+UIDropDownMenu_SetText=function(menu,text) menu.textValue=text end
+CloseDropDownMenus=function() menuClosed=menuClosed+1 end
+local function openMenu(menu,level,group)
+    dropdown=menu;menu.buttons={}
+    menu.initialize(menu,level or 1,group)
+    dropdown=nil
+    return menu.buttons
+end
+local function menuChoice(menu,id)
+    local groups=openMenu(menu)
+    for _,group in ipairs(groups) do
+        for _,choice in ipairs(openMenu(menu,2,group.menuList)) do
+            if choice.value==id then return choice end
+        end
+    end
+    error("Missing menu choice "..id)
+end
 assert(loadfile("WindfuryProcSound/Sounds.lua"))("WindfuryProcSound", ns)
-check(#ns.sounds == 21, "21 sounds")
+check(#ns.sounds == 66, "0.4.1 catalog plus two new sounds")
+local baselineIDs={
+ "lightsaber","wolf_howl","chicken","laser_pulse","laser_burst","laser_zing","phaser_drop","phaser_rise",
+ "power_up","arcade_bonus","victory_ping","high_swoop","bass_drop","triple_boop","happy_blip","phase_jump",
+ "space_crackle","three_tone","electric_zap","double_zap","lightsabercrit_proc","cat","cow","duck","goat",
+ "lion","pig","blast","boxing_bell","heavy_punch","shotgun","temple_bell","thunder","whip_crack","air_horn",
+ "applause","cartoon_voice","spring_boing","squeaky_toy","cash_register","coin_drop","drum_roll","heartbeat",
+ "triangle","water_drop","cannon","metal_parry","firework","frying_pan","slot_machine","critsound_critical_damage",
+ "critsound_dominating","critsound_unstoppable","critsound_wicked_sick","critsound_godlike","critsound_fight",
+ "wfgw_whoosh","wfgw_whoosh_two","wfgw_stay_positive","wfgw_what_was_that","wfgw_purr","wfgw_boing",
+ "wfgw_boing_two","shaman_warning_windfury",
+}
+for i,id in ipairs(baselineIDs) do check(ns.sounds[i].id==id,"0.4.1 numeric sound position preserved "..i) end
+check(ns.sounds[65].id=="bonk" and ns.sounds[66].id=="fruit_machine","new sounds append after all 0.4.1 positions")
 local unique = {}
 for _, s in ipairs(ns.sounds) do
     check(not unique[s.id], "unique sound " .. s.id); unique[s.id] = true
@@ -87,6 +131,7 @@ for _, s in ipairs(ns.sounds) do
     else check(s.soundKit==1018 and s.fallbackSoundKit==53875, "Warcraft wolf uses native howl kits") end
 end
 assert(loadfile("WindfuryProcSound/Addon.lua"))("WindfuryProcSound", ns)
+check(#ns.activeSounds==49,"49 active sounds retain 17 retired legacy positions")
 assert(loadfile("WindfuryProcSound/Options.lua"))("WindfuryProcSound", ns)
 local event=ns.frame.scripts.OnEvent
 event(ns.frame, "ADDON_LOADED", "WindfuryProcSound")
@@ -114,23 +159,17 @@ SlashCmdList.WINDFURYPROCSOUND("test")
 check(#played==3, "manual preview works when disabled")
 SlashCmdList.WINDFURYPROCSOUND("options")
 check(WindfuryProcSoundOptions.shown, "options opens")
-check(WindfuryProcSoundOptions.height == 600, "tabbed options window fits all controls")
-local positions, selectable = {}, 0
-for _, f in ipairs(frames) do
-    if f.width == 146 and f.point then
-        local key = tostring(f.point[2]) .. ":" .. tostring(f.point[3])
-        check(not positions[key], "sound buttons do not overlap")
-        positions[key] = true; selectable = selectable + 1
-    end
+check(WindfuryProcSoundOptions.height == 680, "tabbed options window fits all controls")
+for _,menu in ipairs({WindfuryProcSoundWeaponMenu,WindfuryProcSoundTotemMenu,WindfuryProcSoundExtraMenu}) do
+    check(menu.anchor[3]=="TOPLEFT" and menu.anchor[4]==menu.Button and menu.anchor[5]=="BOTTOMLEFT","dropdown stays anchored below its own arrow")
 end
-check(selectable == 21, "all 21 sounds have option buttons")
 SlashCmdList.WINDFURYPROCSOUND("sound 21")
 check(ns.db.sound == "lightsabercrit_proc", "select new LightsaberCrit option")
 check(played[#played][1]:find("lightsabercrit_proc.ogg",1,true) ~= nil, "new sound plays correct file")
 SlashCmdList.WINDFURYPROCSOUND("sound lightsabercrit_proc")
 check(ns.db.sound == "lightsabercrit_proc", "select new sound by ID")
 SlashCmdList.WINDFURYPROCSOUND("reset")
-check(ns.db.enabled and ns.db.sound=="lightsaber", "reset command")
+check(ns.db.enabled and ns.db.sound=="lightsabercrit_proc", "reset command preserves 0.4.1 default cue")
 SlashCmdList.WINDFURYPROCSOUND("status")
 check(#messages > 0, "status prints")
 PlaySoundFile=function() return false end
@@ -388,12 +427,19 @@ ui.Play(nil,true,"totem")
 clock=2001;ue(ui.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
 check(ui.detector.weapon==3 and ui.suppressed==1 and #played==n+3,"gap limits audio only; preview bypasses without changing automatic interval")
 ui.db.minGap=0;ui.db.randomSound=true;ui.ResetCounters()
-local previous
+local previous,retiredPaths = nil,{}
+for _,sound in ipairs(ui.sounds) do
+ if sound.retired then retiredPaths[C.SoundPath("WindfuryProcSound",sound.file,100)]=true end
+end
+local actualRandom=math.random
+math.random=function(maximum) return math.min(4,maximum) end
 for i=1,40 do
  clock=2100+i;ui.Play(nil,false,"weapon")
  local path=played[#played][1]
  check(path~=previous,"random cues avoid immediate repeat "..i);previous=path
+ check(not retiredPaths[path],"random selection excludes retired legacy cues "..i)
 end
+math.random=actualRandom
 n=#played;ui.Play("chicken",true)
 check(#played==n+1 and played[#played][1]:find("chicken.ogg",1,true),"explicit preview ignores random mode")
 local beforeSettings=ui.db.weaponSound
@@ -414,18 +460,60 @@ clickText("Playback")
 check(WindfuryProcSoundPlaybackPanel.shown and not WindfuryProcSoundSoundPanel.shown,"Playback tab switches visibility")
 WindfuryProcSoundGapSlider:SetValue(0.26)
 check(math.abs(ui.db.minGap-0.3)<0.001,"gap slider snaps to 0.1 second")
-clickText("Sounds");clickText("Weapon")
+clickText("Sounds")
 ui.db.previewOnSelect=false;n=#played
-clickText("Chicken")
+menuChoice(WindfuryProcSoundWeaponMenu,"chicken").func()
 check(ui.db.weaponSound=="chicken" and #played==n,"sound selection is quiet by default")
 ui.db.previewOnSelect=true
-clickText("Laser Pulse")
-check(ui.db.weaponSound=="laser_pulse" and #played==n+1,"optional selection preview plays once")
+local closedBefore=menuClosed
+menuChoice(WindfuryProcSoundWeaponMenu,"bonk").func()
+check(ui.db.weaponSound=="bonk" and #played==n+1,"optional menu selection preview plays once")
+check(menuClosed==closedBefore+1,"choosing a sound closes native menus")
+ui.db.previewOnSelect=false
+ui.SelectSound("laser_pulse","weapon")
+check(WindfuryProcSoundWeaponMenu.textValue=="Laser Pulse","saved retired cue remains displayed")
+local legacyMenu=menuChoice(WindfuryProcSoundWeaponMenu,"laser_pulse")
+check(legacyMenu.checked and legacyMenu.text=="Laser Pulse","selected retired cue is accessible in saved legacy menu")
+ui.Play(nil,true,"weapon")
+check(played[#played][1]:find("laser_pulse.ogg",1,true),"saved retired cue remains playable")
+menuChoice(WindfuryProcSoundWeaponMenu,"chicken").func()
+local visible,seen=0,{}
+for _,group in ipairs(openMenu(WindfuryProcSoundWeaponMenu)) do
+ check(group.hasArrow and group.notCheckable and group.menuList==group.text,"first-level category opens submenu "..group.text)
+ local entries=openMenu(WindfuryProcSoundWeaponMenu,2,group.menuList)
+ check(#entries>0 and #entries<=10,"category submenu remains bounded "..group.text)
+ for _,choice in ipairs(entries) do
+  check(not seen[choice.value] and not ui.GetSound(choice.value).retired,"active cue appears once in categories "..choice.value)
+  seen[choice.value]=true;visible=visible+1
+ end
+end
+check(visible==49,"all active cues are browsable without duplicates")
+for _,group in ipairs(openMenu(WindfuryProcSoundWeaponMenu)) do check(group.text~="Saved legacy cue","retired group disappears after selecting active cue") end
+local actualActive=ui.activeSounds
+ui.activeSounds={}
+for i=1,21 do
+ local sound={}
+ for key,value in pairs(actualActive[i]) do sound[key]=value end
+ sound.category="Paging test";ui.activeSounds[i]=sound
+end
+local pages=openMenu(WindfuryProcSoundWeaponMenu)
+check(#pages==3,"one large category splits into three native submenus")
+local paged,pagedIDs=0,{}
+for _,page in ipairs(pages) do
+ local entries=openMenu(WindfuryProcSoundWeaponMenu,2,page.menuList)
+ check(#entries<=10,"large category page never exceeds ten entries")
+ for _,choice in ipairs(entries) do
+  check(not pagedIDs[choice.value],"paginated cue appears once "..choice.value)
+  pagedIDs[choice.value]=true;paged=paged+1
+ end
+end
+check(paged==21,"category pagination retains every cue")
+ui.activeSounds=actualActive;ui.RefreshOptions()
 clickText("Close");ui.ShowOptions()
 check(WindfuryProcSoundOptions.shown,"options reopen after Close")
 ui.ResetOptions()
 check(ui.db.volume==100 and ui.db.minGap==0 and not ui.db.randomSound and not ui.db.previewOnSelect,"reset restores convenience defaults")
-check(ui.db.weaponSound=="lightsaber" and ui.db.totemSound=="lightsaber","reset restores both sounds")
+check(ui.db.weaponSound=="lightsabercrit_proc" and ui.db.totemSound=="lightsabercrit_proc","reset restores 0.4.1 default on both sounds")
 
 -- Native Warcraft howl: exact volume override, known same-wolf fallback, no redistribution.
 ui.SetVolume(40);ui.Play("wolf_howl",true)
@@ -465,4 +553,172 @@ UIParent.GetWidth=function() return 1920 end
 UIParent.GetHeight=function() return 1080 end
 WindfuryProcSoundOptions:Hide();ui.ShowOptions()
 check(WindfuryProcSoundOptions.scale==1,"normal screens preserve readable native scale")
+-- Experimental extra hits use a separate selection/toggle and never merge
+-- different item/talent spells just because they occur at the same time.
+check(not C.Settings({},ns.sounds).extra, "other extra hits default off")
+check(C.Settings({sound="chicken"},ns.sounds).extraSound=="chicken", "shared selection migrates to extra cue")
+UnitClass=function() return "Warrior","WARRIOR" end
+re(runtime.frame,"PLAYER_ENTERING_WORLD")
+runtime.ResetCounters()
+runtime.db.enabled=true;runtime.db.weapon=true;runtime.db.totem=true;runtime.db.extra=false
+local extraIDs={1257049,15601,18797,21919}
+clock=3000
+for _,id in ipairs(extraIDs) do re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,0,0,nil) end
+check(runtime.detector.count==0,"all experimental extra-hit candidates disabled initially")
+runtime.db.extra=true
+runtime.SelectSound("bonk","extra")
+runtime.SelectSound("chicken","totem")
+for _,id in ipairs(extraIDs) do
+ clock=clock+1;n=#played
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,0,0,nil)
+ check(#played==n+1 and played[#played][1]:find("bonk.ogg",1,true),"extra candidate uses own cue "..id)
+ re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","extra"..id,id)
+ re(runtime.frame,"UNIT_AURA","player",{addedAuras={{spellId=id,auraInstanceID=id}}})
+ check(#played==n+1,"same extra proc deduplicates across sources "..id)
+end
+check(runtime.detector.extra==4 and runtime.detector.weapon==0 and runtime.detector.totem==0,"other extra hits counted separately")
+clock=3010;n=runtime.detector.extra
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",15601,nil,0,0,nil)
+re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","distinct-flurry",18797)
+check(runtime.detector.extra==n+2,"simultaneous different item procs are not deduplicated together")
+clock=3011;n=runtime.detector.extra
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",15601,nil,0,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",15601,nil,0,0,nil)
+check(runtime.detector.extra==n+2,"rapid distinct same-source extra procs remain separate")
+for _,id in ipairs({15600,12281,1290261,16459,11815,871,17705}) do
+ n=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,0,0,nil)
+ re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","passive"..id,id)
+ re(runtime.frame,"UNIT_AURA","player",{addedAuras={{spellId=id,auraInstanceID=id}}})
+ check(runtime.detector.count==n,"passive, Classic-only and item IDs excluded "..id)
+end
+for _,id in ipairs(extraIDs) do
+ for field=1,5 do
+  local args={id,nil,0,0,nil};args[field]=secret;n=runtime.detector.count
+  re(runtime.frame,"SPELL_UPDATE_COOLDOWN",unpackArgs(args,1,5))
+  check(runtime.detector.count==n,"restricted extra cooldown field ignored "..id..":"..field)
+ end
+ n=runtime.detector.count
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,2619,0,nil)
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,0,133,nil)
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,id,0,0,nil)
+ re(runtime.frame,"SPELL_UPDATE_COOLDOWN",id,nil,0,0,11815)
+ re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","target","other-player",id)
+ re(runtime.frame,"UNIT_AURA","player",{isFullUpdate=true,addedAuras={{spellId=id,auraInstanceID=id}}})
+ check(runtime.detector.count==n,"nonmatching or non-player extra candidates ignored "..id)
+end
+UnitClass=function() return "Shaman","SHAMAN" end
+re(runtime.frame,"PLAYER_ENTERING_WORLD")
+clock=3020;n=runtime.detector.count
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",1257049,nil,0,0,nil)
+re(runtime.frame,"UNIT_SPELLCAST_SUCCEEDED","player","not-warrior",1257049)
+re(runtime.frame,"UNIT_AURA","player",{addedAuras={{spellId=1257049,auraInstanceID=1}}})
+check(runtime.detector.count==n,"Weaponmaster extra attack is warrior-only on all sources")
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",15601,nil,0,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",18797,nil,0,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",21919,nil,0,0,nil)
+check(runtime.detector.count==n+3,"item extra attacks can be detected on a shaman")
+runtime.db.extra=false;n=runtime.detector.extra
+clock=3030
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",439440,nil,0,0,nil)
+re(runtime.frame,"SPELL_UPDATE_COOLDOWN",8516,nil,2619,0,nil)
+check(runtime.detector.weapon==1 and runtime.detector.totem==1 and runtime.detector.extra==n,"Windfury remains independent of extra-hit toggle")
+SlashCmdList.WINDFURYPROCSOUND("extra on")
+check(ui.db.extra,"slash command enables extra-hit experiment")
+SlashCmdList.WINDFURYPROCSOUND("sound extra 65")
+check(ui.db.extraSound=="bonk" and ui.db.weaponSound=="lightsabercrit_proc","extra slash selection preserves Windfury cue")
+SlashCmdList.WINDFURYPROCSOUND("test extra")
+check(played[#played][1]:find("bonk.ogg",1,true),"extra preview uses its selection")
+SlashCmdList.WINDFURYPROCSOUND("extra off")
+check(not ui.db.extra,"slash command disables extra-hit experiment")
+clickText("Sounds")
+menuChoice(WindfuryProcSoundExtraMenu,"fruit_machine").func()
+check(ui.db.extraSound=="fruit_machine" and ui.db.weaponSound=="lightsabercrit_proc" and WindfuryProcSoundExtraMenu.textValue=="Fruit machine payout","extra dropdown selection preserves Windfury cue")
+clickText("Preview Other")
+check(played[#played][1]:find("fruit_machine.ogg",1,true),"extra UI preview uses its selection")
+WindfuryProcSoundExtraSpeaker.scripts.OnClick()
+check(played[#played][1]:find("fruit_machine.ogg",1,true),"extra speaker previews its own selection")
+menuChoice(WindfuryProcSoundWeaponMenu,"bonk").func()
+clickText("Use Weapon cue for both")
+check(ui.db.weaponSound=="bonk" and ui.db.totemSound=="bonk" and ui.db.extraSound=="fruit_machine","base Both button preserves independent other extra cue")
+ui.SelectSound("chicken","totem")
+clickText("Use Weapon cue for all")
+check(ui.db.weaponSound=="bonk" and ui.db.totemSound=="bonk" and ui.db.extraSound=="bonk","All updates all three selections")
+ui.SelectSound("fruit_machine","extra");ui.SelectSound("chicken","both")
+check(ui.db.weaponSound=="chicken" and ui.db.totemSound=="chicken" and ui.db.extraSound=="fruit_machine","base both API preserves independent other extra cue")
+ui.ResetOptions()
+check(not ui.db.extra and ui.db.extraSound=="lightsabercrit_proc","restore defaults turns experiment off and resets extra selection")
+runtime.ResetCounters()
+check(runtime.detector.extra==0,"counter reset clears extra hits")
+
+-- Fractional duration limits stop only the owned handle, without fade padding.
+local timers, timedStops = {}, {}
+C_Timer={NewTimer=function(seconds,callback)
+ local timer={seconds=seconds,at=clock+seconds,callback=callback}
+ function timer:Cancel() self.cancelled=true end
+ timers[#timers+1]=timer
+ return timer
+end}
+StopSound=function(handle,fade) timedStops[#timedStops+1]={handle=handle,fade=fade,at=clock} end
+local function advance(to)
+ clock=to
+ for _,timer in ipairs(timers) do
+  if not timer.cancelled and not timer.fired and timer.at<=clock then timer.fired=true;timer.callback() end
+ end
+end
+ui.StopPlayback();ui.ResetOptions()
+check(ui.db.maxDuration==0,"default maximum duration is unlimited")
+check(math.abs(C.Settings({maxDuration=1.24},ns.sounds).maxDuration-1.2)<0.00001,"saved duration snaps to tenths")
+check(C.Settings({maxDuration=math.huge},ns.sounds).maxDuration==0,"nonfinite saved duration repaired")
+ui.SetMaxDuration(1.1);clock=4000;ui.Play("fruit_machine",true)
+local timer=timers[#timers];local handle=#played
+check(math.abs(timer.seconds-1.1)<0.00001,"preview schedules exact 1.1 second limit")
+n=#timedStops;advance(4001.099)
+check(#timedStops==n,"duration does not stop before deadline")
+advance(timer.at)
+check(#timedStops==n+1 and timedStops[#timedStops].handle==handle and timedStops[#timedStops].fade==0,"duration stops owned cue at deadline with zero fade")
+ui.SetMaxDuration(1.2);clock=4010;ui.Play("fruit_machine",false,"extra")
+check(math.abs(timers[#timers].seconds-1.2)<0.00001,"automatic extra cue uses 1.2 second limit")
+local oldTimer=timers[#timers]
+clock=4010.5;ui.Play("chicken",true);n=#timedStops
+check(oldTimer.cancelled,"new cue cancels previous duration timer")
+oldTimer.callback()
+check(#timedStops==n,"stale timer cannot stop replacement cue")
+ui.SetMaxDuration(2.5)
+check(math.abs(timers[#timers].seconds-2.5)<0.00001,"2.5 second setting uses exact fractional value")
+clock=4011.5;ui.SetMaxDuration(2)
+check(math.abs(timers[#timers].seconds-1)<0.00001,"changing limit uses elapsed cue time")
+n=#timedStops;ui.SetMaxDuration(0.5)
+check(#timedStops==n+1 and timedStops[#timedStops].fade==0,"shortening below elapsed time stops cue immediately")
+ui.SetMaxDuration(2.5);clock=4020;ui.Play("wolf_howl",true)
+timer=timers[#timers]
+check(math.abs(timer.seconds-2.5)<0.00001,"native SoundKit also uses duration cap")
+ui.SetMaxDuration(0)
+check(timer.cancelled,"unlimited cancels active deadline")
+n=#timedStops;timer.callback()
+check(#timedStops==n,"cancelled unlimited deadline cannot stop current cue")
+clock=4030;ui.SetMaxDuration(1.1);ui.Play("fruit_machine",true);timer=timers[#timers]
+ui.SetVolume(0)
+check(timer.cancelled,"mute cancels duration timer")
+ui.SetVolume(100);ui.Play("fruit_machine",true);timer=timers[#timers]
+SlashCmdList.WINDFURYPROCSOUND("off")
+check(timer.cancelled,"disable cancels duration timer")
+ui.ResetOptions();clock=4040
+SlashCmdList.WINDFURYPROCSOUND("duration 2.5")
+check(ui.db.maxDuration==2.5,"duration slash accepts decimal seconds")
+local input=WindfuryProcSoundDurationInput
+input:SetText("1.1");input.scripts.OnEnterPressed(input)
+check(math.abs(ui.db.maxDuration-1.1)<0.00001 and input:GetText()=="1.1","duration input preserves one decimal place")
+input:SetText("1.26");input.scripts.OnEditFocusLost(input)
+check(math.abs(ui.db.maxDuration-1.3)<0.00001 and input:GetText()=="1.3","duration input rounds to tenths on focus loss")
+input:SetText("bad");input.scripts.OnEnterPressed(input)
+check(math.abs(ui.db.maxDuration-1.3)<0.00001 and input:GetText()=="1.3","invalid duration input keeps current value")
+input:SetText("9.9");input.scripts.OnEscapePressed(input)
+check(math.abs(ui.db.maxDuration-1.3)<0.00001 and input:GetText()=="1.3","Escape restores saved duration")
+ui.SetMaxDuration(99)
+check(ui.db.maxDuration==30,"duration clamps to documented maximum")
+ui.SetMaxDuration(-1)
+check(ui.db.maxDuration==0,"negative duration clamps to unlimited")
+ui.ResetOptions()
+check(ui.db.maxDuration==0,"restore defaults clears duration cap")
 print("PASS: " .. tests .. " assertions. Mocked API/UI tests; native game audio and layout require live checks.")

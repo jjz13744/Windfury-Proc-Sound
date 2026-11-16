@@ -1,5 +1,60 @@
 # Compatibility research
 
+## Other extra hits investigation (2026-11-16, version 0.6.0)
+
+The existing Windfury cooldown detector is independently visible in the upstream
+addon, matching spell 439440, category 0 and recovery category 0:
+https://github.com/GuppitusMaximus/windfury/blob/main/Windfury/Windfury.lua
+
+Blizzard's Warrior deep dive says Sword Specialization was folded into
+Weaponmaster in Forever. This is still a sword extra-attack effect, rather than
+the old Classic talent's public spell ID:
+https://worldofwarcraft.blizzard.com/en-us/news/24301514/world-of-warcraft-forever-class-deep-dives-priest-and-warrior
+
+Queried the client DB2 exports for build **1.60.1.70938**, filtering exact numeric
+IDs after downloading (Wago's filter can return substring matches). These are
+client-data facts, not proof of runtime event delivery:
+
+| Source | Client-data chain | Accepted triggered spell |
+| --- | --- | --- |
+| Weaponmaster (Sword) | Spell 12281, SpellEffect 688843 triggers 1257049 | 1257049 |
+| Hand of Justice | Item 11815 → ItemEffect 99238 → passive spell 15600 → triggered spell 15601 | 15601 |
+| Flurry Axe | Item 871 → ItemEffect 97087 → spell 18797 | 18797 |
+| Thrash Blade | Item 17705 → ItemEffect 100397 → spell 21919 | 21919 |
+
+Each accepted spell has effect **19 (Add Extra Attacks)** with base value **1**.
+Hand of Justice 15600 and Weaponmaster 12281/1290261 are passive/application
+effects and must not count as an extra attack. Classic's 16459 is not used.
+
+Reproducible source exports (replace the numeric filter to inspect other rows):
+
+- https://wago.tools/db2/SpellName/csv?build=1.60.1.70938&filter[ID]=1257049
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=12281
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=1257049
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=15600
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=15601
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=18797
+- https://wago.tools/db2/SpellEffect/csv?build=1.60.1.70938&filter[SpellID]=21919
+- https://wago.tools/db2/ItemXItemEffect/csv?build=1.60.1.70938&filter[ItemID]=11815
+- https://wago.tools/db2/ItemEffect/csv?build=1.60.1.70938&filter[ID]=99238
+
+No SpellCategories or SpellCooldowns rows were returned for these four triggered
+spells. That absence **does not establish their runtime cooldown event payload**:
+even Windfury Totem 8516's client category is 0 while the observed event category
+was 2619. The new feature therefore stays **off by default**, labelled
+experimental. It tries public cooldown candidates `(procID, nil, 0, 0, nil)` and
+readable player casts/added auras of those exact IDs. The zero-category shape is
+an explicit hypothesis. No live item/Sword event trace was found or supplied;
+neither completeness nor other-player isolation is established. A working
+preview verifies sound playback only. Existing tracing captures unknown
+signatures too, so future observations can refine the filter without guessing
+from attack timing. Weaponmaster is warrior-gated; item procs can affect any
+player class. Different item/talent IDs never deduplicate one another.
+
+The duration cap uses C_Timer.NewTimer and StopSound on only the addon's handle;
+the deadline uses no fade-out padding. Game scheduling is frame-based:
+https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua
+
 Checked 2026-11-14. Links identify the evidence used, not live-game validation.
 
 - GaleCount, an addon specifically targeting WoW Forever, implements player spellcast and added-aura proc detection using IDs 8233, 8236, 10484, 16361 (weapon) and 8516, 10608, 10610 (totem). Its code cites DB2 build 1.60.1.70862. We independently implemented a narrower sound-only addon using those factual IDs; no source code was copied.
@@ -50,3 +105,10 @@ https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_AP
 
 Warcraft's wolf howl assets are WolfStandVar4 / WolfStandVar4b, FileDataIDs564211/564217. The known classic WolfFidget2 kit1018 is tried first; modern wolf-howl kit53875 is an unavailable-kit fallback. These exact kits are not yet runtime-tested in the user's Forever client. No game asset is extracted or bundled.
 https://github.com/wowdev/wow-listfile
+
+## Categorized dropdown implementation (0.4.0)
+
+The Forever Blizzard UI source retains UIDropDownMenuTemplate and the Initialize, CreateInfo, AddButton, SetWidth and SetText helpers. Category rows preserve the open menu on click; each submenu is limited to ten choices. This is source/API validation, not live UI rendering.
+
+- https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_SharedXML/Mainline/UIDropDownMenu.lua
+- https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_SharedXML/Mainline/UIDropDownMenuTemplates.xml

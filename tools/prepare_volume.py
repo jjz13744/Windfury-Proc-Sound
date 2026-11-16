@@ -33,7 +33,6 @@ SOUNDS = ADDON / "sounds"
 MANIFEST = ADDON / "volume_manifest.json"
 REPORT = ROOT / "references" / "volume_validation.json"
 LEVELS = tuple(range(10, 100, 10))
-EXPECTED_ORIGINALS = 20
 QUALITY = "6"
 TOLERANCES = {
     "container_duration_samples": 1,
@@ -182,17 +181,21 @@ def main():
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
-    prior = json.loads(MANIFEST.read_text()) if args.verify_only else None
+    prior = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else None
+    if args.verify_only and not prior:
+        raise ValueError("No volume manifest exists; render the banks before verifying")
     excluded = set(args.exclude if args.exclude is not None else
                    (prior or {}).get("excluded_source_files", []))
     if any(Path(name).name != name or not name.endswith(".ogg") for name in excluded):
         parser.error("--exclude accepts only an OGG filename, not a path")
+    catalog = json.loads((ADDON / "sound-catalog.json").read_text())
+    expected_files = {item["file"] for item in catalog if item.get("file")} - excluded
     sources = sorted(path for path in SOUNDS.glob("*.ogg") if path.name not in excluded)
-    expected_count = EXPECTED_ORIGINALS - len(excluded)
-    if not sources or len(sources) != expected_count:
-        raise ValueError(f"Expected {expected_count} included originals; found {len(sources)}")
+    expected_count = len(expected_files)
+    if not sources or {path.name for path in sources} != expected_files:
+        raise ValueError("Custom originals differ from the sound catalog")
     original_hashes = {relative(path): sha256(path) for path in sources}
-    if prior:
+    if args.verify_only and prior:
         expected = {item["path"]: item["sha256"] for item in prior["originals"]}
         if expected != original_hashes:
             raise ValueError("Original hashes differ from the recorded manifest")
@@ -201,8 +204,18 @@ def main():
         source_info = {item["path"]: item for item in originals}
         jobs = [(source, level) for level in LEVELS for source in sources]
         if not args.verify_only:
-            list(executor.map(lambda job: encode(*job), jobs))
-        print(f"{'Checking' if args.verify_only else 'Encoded'} {len(jobs)} volume variants.",
+            previous = {item["path"]: item for item in (prior or {}).get("variants", [])}
+            def needs_encode(job):
+                source, level = job
+                target = SOUNDS / f"volume_{level}" / source.name
+                saved = previous.get(relative(target))
+                return not (saved and target.is_file() and saved.get("validation_passed")
+                            and saved["source_sha256"] == original_hashes[relative(source)]
+                            and saved["sha256"] == sha256(target))
+            pending = [job for job in jobs if needs_encode(job)]
+            list(executor.map(lambda job: encode(*job), pending))
+            print(f"Encoded {len(pending)} new/changed variants; reused {len(jobs) - len(pending)} validated files.")
+        print(f"Checking {len(jobs)} volume variants.",
               flush=True)
         targets = [SOUNDS / f"volume_{level}" / source.name for source, level in jobs]
         decoded = list(executor.map(inspect, targets))
@@ -222,7 +235,7 @@ def main():
         errors.append("Original file hashes changed during the run")
     if any(count != expected_count for count in bank_file_counts.values()):
         errors.append("A volume bank has an unexpected OGG file count")
-    if prior:
+    if args.verify_only and prior:
         expected = {item["path"]: item["sha256"] for item in prior["variants"]}
         if expected != {item["path"]: item["sha256"] for item in variants}:
             errors.append("Derived file hashes differ from the recorded manifest")
@@ -251,6 +264,7 @@ def main():
         "generator": "tools/prepare_volume.py",
         "ffmpeg_version": run("ffmpeg", "-version").decode().splitlines()[0],
         "encoding": {"codec": "libvorbis", "quality": int(QUALITY), "bitexact": True,
+                     "reuse": "Existing validated variants are reused only when source and output hashes match. ffmpeg_version identifies the current validation/encoding tool; reused files may use an earlier encoder.",
                      "gain_type": "linear PCM amplitude", "normalization": False,
                      "amplification": False, "levels_percent": list(LEVELS),
                      "timing": "Rebuild timestamps from PCM sample positions, retaining the source initial timestamp. No silence added or audio samples deliberately trimmed."},

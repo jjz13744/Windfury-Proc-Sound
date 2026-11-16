@@ -1,0 +1,24 @@
+{
+  "base_version": "0.4.1",
+  "build_version": "0.6.1",
+  "source_archive": "WindfuryProcSound-0.4.1.zip",
+  "source_sha256": "ae632b24186763ad1f499c13c599ca1ae2ffbc57fbdfb3d46bb283a79a946d34",
+  "preserved_catalog_positions": 64,
+  "active_choices": 49,
+  "retired_choices": 17,
+  "appended_cues": [
+    "bonk",
+    "fruit_machine"
+  ],
+  "custom_originals": 65,
+  "volume_variants": 585,
+  "baseline_files_retained_byte_identical": [
+    "EXPANSION_CREDITS.md",
+    "LEGACY_AUDIO_PROVENANCE.md",
+    "LICENSE",
+    "LICENSE-CC-BY-3.0.txt",
+    "LICENSE-CC0-1.0.txt",
+    "media/speaker.tga"
+  ],
+  "combo_included": false
+}

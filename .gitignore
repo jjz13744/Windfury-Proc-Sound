@@ -5,6 +5,6 @@ __pycache__/
 *.pyc
 .library-helper/
 sources/
-sounds/
+/sounds/
 sounds-manifest.json
 SoundCatalog.lua

@@ -2,6 +2,9 @@ local ADDON, ns = ...
 local Core = ns.Core
 local frame = CreateFrame("Frame")
 local soundHandle
+local soundStarted
+local durationTimer
+local playbackSerial = 0
 local lastAutomaticPlay
 local lastRandomIndex
 local unavailableWarned = false
@@ -12,7 +15,49 @@ ns.soundFailures = 0
 ns.suppressed = 0
 
 function ns.Print(message)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff70caffWindfury Proc Sound:|r " .. message)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff70caffWindfury/Extra Hit Proc Sound:|r " .. message)
+end
+
+-- Keep old IDs and numeric positions valid, but omit retired cues from browsing
+-- and random mode. A saved retired choice is never silently replaced.
+ns.activeSounds = {}
+for _, sound in ipairs(ns.sounds) do
+    if not sound.retired then ns.activeSounds[#ns.activeSounds + 1] = sound end
+end
+
+local function groupedSounds(kind)
+    local groups, buckets, menus = {}, {}, {}
+    for _, sound in ipairs(ns.activeSounds) do
+        local category = sound.category or "Other"
+        if not buckets[category] then buckets[category] = {}; groups[#groups + 1] = category end
+        local bucket = buckets[category]; bucket[#bucket + 1] = sound
+    end
+    table.sort(groups)
+    local titles = {}
+    for _, category in ipairs(groups) do
+        local bucket = buckets[category]
+        local pages = math.ceil(#bucket / 10)
+        for page = 1, pages do
+            local title = pages == 1 and category or (category .. " (" .. page .. "/" .. pages .. ")")
+            titles[#titles + 1] = title; menus[title] = {}
+            for i = (page - 1) * 10 + 1, math.min(page * 10, #bucket) do
+                menus[title][#menus[title] + 1] = bucket[i]
+            end
+        end
+    end
+    local selected = ns.GetSound(ns.db[kind .. "Sound"])
+    if selected.retired then
+        titles[#titles + 1] = "Saved legacy cue"; menus["Saved legacy cue"] = {selected}
+    end
+    return titles, menus
+end
+
+function ns.SoundGroups(kind)
+    local titles = groupedSounds(kind); return titles
+end
+
+function ns.MenuSounds(kind, group)
+    local _, menus = groupedSounds(kind); return menus[group] or {}
 end
 
 function ns.GetSound(id)
@@ -20,19 +65,47 @@ function ns.GetSound(id)
     return ns.sounds[1]
 end
 
-function ns.StopPlayback()
-    if soundHandle and type(StopSound) == "function" then pcall(StopSound, soundHandle, 50) end
+local function cancelDurationTimer()
+    playbackSerial = playbackSerial + 1
+    if durationTimer then durationTimer:Cancel(); durationTimer = nil end
+end
+
+function ns.StopPlayback(immediate)
+    cancelDurationTimer()
+    if soundHandle and type(StopSound) == "function" then pcall(StopSound, soundHandle, immediate == true and 0 or 50) end
     soundHandle = nil
+    soundStarted = nil
+end
+
+local function applyDurationLimit()
+    cancelDurationTimer()
+    if not soundHandle or not soundStarted or ns.db.maxDuration == 0 then return end
+    local remaining = ns.db.maxDuration - (GetTime() - soundStarted)
+    if remaining <= 0 then ns.StopPlayback(true); return end
+    local serial = playbackSerial
+    durationTimer = C_Timer.NewTimer(remaining, function()
+        -- A replaced/stopped cue must never let its old timer stop a new cue.
+        if serial ~= playbackSerial then return end
+        durationTimer = nil
+        ns.StopPlayback(true)
+    end)
+end
+
+function ns.SetMaxDuration(value)
+    ns.db.maxDuration = Core.Snap(value, 0, 30, 0.1, ns.db.maxDuration)
+    applyDurationLimit()
+    if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
 function ns.SelectSound(id, kind)
     local selected = ns.GetSound(id)
-    if kind == "weapon" or kind == "totem" then
+    if kind == "weapon" or kind == "totem" or kind == "extra" then
         ns.db[kind .. "Sound"] = selected.id
     else
         ns.db.sound = selected.id
         ns.db.weaponSound = selected.id
         ns.db.totemSound = selected.id
+        if kind ~= "both" then ns.db.extraSound = selected.id end
     end
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
@@ -49,14 +122,14 @@ function ns.Play(id, preview, kind)
     if not preview and lastAutomaticPlay and now - lastAutomaticPlay < ns.db.minGap then
         ns.suppressed = ns.suppressed + 1; return true
     end
-    kind = kind == "totem" and "totem" or "weapon"
+    kind = (kind == "totem" or kind == "extra") and kind or "weapon"
     local selected = ns.GetSound(id or ns.db[kind .. "Sound"] or ns.db.sound)
     if not preview and ns.db.randomSound then
-        local n = #ns.sounds
+        local n = #ns.activeSounds
         local index = math.random(lastRandomIndex and n > 1 and n - 1 or n)
         if lastRandomIndex and n > 1 and index >= lastRandomIndex then index = index + 1 end
         lastRandomIndex = index
-        selected = ns.sounds[index]
+        selected = ns.activeSounds[index]
     end
     if ns.db.volume == 0 then
         ns.StopPlayback()
@@ -65,7 +138,7 @@ function ns.Play(id, preview, kind)
         return true
     end
     -- Custom cues use encoded gain; the native Warcraft howl uses SoundKit's
-    -- documented volume override. Neither changes global CVars or audio timers.
+    -- documented volume override. Neither changes global volume CVars.
     ns.StopPlayback()
     local ok, willPlay, handle
     if selected.soundKit then
@@ -82,6 +155,8 @@ function ns.Play(id, preview, kind)
     end
     if ok and willPlay then
         soundHandle = handle
+        soundStarted = GetTime()
+        applyDurationLimit()
         if preview then ns.Print("Preview: " .. selected.name .. " (" .. ns.db.volume .. "%)")
         else lastAutomaticPlay = now end
         return true
@@ -113,6 +188,7 @@ end
 local function observe(spellID, source, token)
     Core.TraceRecord(ns.trace, source, spellID, GetTime())
     if ns.legacyActive then return end
+    if not Core.IsSecret(spellID) and spellID == 1257049 and not ns.isWarrior then return end
     ns.detector:Observe(spellID, source, token, GetTime(), ns.db)
 end
 
@@ -169,16 +245,22 @@ end
 
 local function syncCooldownEvent()
     -- Totem procs can affect any player class; only Weapon's signature is
-    -- shaman-gated. These are the local client's public cooldown events.
+    -- shaman-gated; Weaponmaster is warrior-gated. Item extra hits are allowed
+    -- on any player class. These are the local
+    -- client's public cooldown events.
     local ok, result = pcall(frame.RegisterEvent, frame, "SPELL_UPDATE_COOLDOWN")
     ns.registered.SPELL_UPDATE_COOLDOWN = ok and result ~= false
 end
 
 local function refreshPlayerClass()
     ns.isShaman = false
+    ns.isWarrior = false
     if type(UnitClass) == "function" then
         local ok, _, class = pcall(UnitClass, "player")
-        if ok and not Core.IsSecret(class) and type(class) == "string" then ns.isShaman = class == "SHAMAN" end
+        if ok and not Core.IsSecret(class) and type(class) == "string" then
+            ns.isShaman = class == "SHAMAN"
+            ns.isWarrior = class == "WARRIOR"
+        end
     end
     syncCooldownEvent()
 end
@@ -199,7 +281,7 @@ function ns.StartTrace()
     frame:SetScript("OnUpdate", function()
         if ns.trace and ns.trace.active and GetTime() >= ns.trace.expires then ns.StopTrace(true) end
     end)
-    ns.Print("30-second diagnostic trace started. Trigger one Windfury proc, then /wfps trace show. Normal sound triggers remain enabled.")
+    ns.Print("30-second diagnostic trace started. Reproduce one proc, then /wfps trace show. Normal sound triggers remain enabled.")
     if not ns.trace.cooldownRegistered then ns.Print("Cooldown event unavailable; tracing readable player casts and auras only.") end
 end
 
@@ -219,7 +301,8 @@ function ns.ShowTrace()
         grouped[key] = grouped[key] + 1
     end
     table.sort(order, function(a,b)
-        local ac, bc = a:find("id=439440", 1, true) ~= nil, b:find("id=439440", 1, true) ~= nil
+        local ac = a:find("id=439440", 1, true) ~= nil
+        local bc = b:find("id=439440", 1, true) ~= nil
         if ac ~= bc then return ac end
         return a < b
     end)
@@ -230,12 +313,13 @@ end
 function ns.Status()
     local d = ns.detector
     if ns.legacyActive then ns.Print("Automatic cues paused while the legacy addon is loaded. Disable the old addon, then reload.") end
-    ns.Print("Version 0.3.2; separate Weapon and Totem cooldown signatures.")
+    ns.Print("Version 0.6.1; based on 0.4.1; Windfury cues and experimental other extra hit sounds.")
     ns.Print((ns.db.enabled and "On" or "Off") .. "; " .. ns.db.volume .. "% addon volume; " .. ns.db.channel .. "; minimum gap " .. string.format("%.1f", ns.db.minGap) .. "s.")
-    ns.Print("Weapon: " .. ns.GetSound(ns.db.weaponSound).name .. "; Totem: " .. ns.GetSound(ns.db.totemSound).name .. "; random=" .. tostring(ns.db.randomSound) .. ".")
-    ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures; " .. ns.suppressed .. " cues muted or rate-limited.")
-    ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ", cooldown=" .. tostring(ns.registered.SPELL_UPDATE_COOLDOWN) .. ", shaman=" .. tostring(ns.isShaman) .. ".")
-    ns.Print("Both own-proc signals observed; playback and other-player isolation still need live verification.")
+    ns.Print("Maximum sound duration: " .. (ns.db.maxDuration == 0 and "unlimited" or string.format("%.1f seconds", ns.db.maxDuration)) .. ".")
+    ns.Print("Weapon: " .. ns.GetSound(ns.db.weaponSound).name .. "; Totem: " .. ns.GetSound(ns.db.totemSound).name .. "; Other extra hits: " .. ns.GetSound(ns.db.extraSound).name .. "; random=" .. tostring(ns.db.randomSound) .. ".")
+    ns.Print("This session: " .. d.count .. " detected procs (Weapon " .. d.weapon .. ", Totem " .. d.totem .. ", Other extra hits " .. d.extra .. "), " .. d.readable .. " readable candidates, " .. d.restricted .. " restricted payloads skipped; " .. ns.soundFailures .. " playback failures; " .. ns.suppressed .. " cues muted or rate-limited.")
+    ns.Print("Events: cast=" .. tostring(ns.registered.UNIT_SPELLCAST_SUCCEEDED) .. ", aura=" .. tostring(ns.registered.UNIT_AURA) .. ", cooldown=" .. tostring(ns.registered.SPELL_UPDATE_COOLDOWN) .. ", shaman=" .. tostring(ns.isShaman) .. ", warrior=" .. tostring(ns.isWarrior) .. ".")
+    ns.Print("Other extra hit experiment=" .. tostring(ns.db.extra) .. "; item/Sword proc IDs are data-backed, but event delivery and cooldown payloads are NOT live-verified. Windfury isolation still needs live verification.")
 end
 
 frame:SetScript("OnEvent", function(_, event, ...)
@@ -249,7 +333,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
         ns.db.lastTrace = ns.trace
         WindfuryProcSoundDB = ns.db
         ns.legacyActive = legacyLoaded()
-        if migrating then ns.Print("Previous options imported into Windfury Proc Sound.") end
+        if migrating then ns.Print("Previous options imported into Windfury/Extra Hit Proc Sound.") end
         if ns.legacyActive then ns.Print("Disable the old addon in the AddOns menu, then reload. New automatic cues are paused to avoid doubles.") end
         ready = true
         registerUnit("UNIT_SPELLCAST_SUCCEEDED")
@@ -267,7 +351,8 @@ frame:SetScript("OnEvent", function(_, event, ...)
         if not ns.legacyActive then
             local kind, restricted = Core.MatchCooldown(spellID, baseSpellID, category, startRecoveryCategory, itemID)
             if restricted then ns.detector.restricted = ns.detector.restricted + 1 end
-            if kind == "totem" or (kind == "weapon" and ns.isShaman) then
+            if kind == "totem" or (kind == "weapon" and ns.isShaman)
+                or (kind == "extra" and (spellID ~= 1257049 or ns.isWarrior)) then
                 ns.detector:Observe(spellID, "cooldown", nil, GetTime(), ns.db)
             end
         end
@@ -298,6 +383,10 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
         local value = tonumber(arg)
         if value then ns.SetVolume(value); ns.Print("Addon volume: " .. ns.db.volume .. "%. Applies to subsequent cues; game channel/master settings still apply.")
         else ns.Print("/wfps volume 0-100 (10% steps)") end
+    elseif cmd == "duration" then
+        local value = tonumber(arg)
+        if value then ns.SetMaxDuration(value); ns.Print("Maximum sound duration: " .. string.format("%.1f", ns.db.maxDuration) .. "s (0 = unlimited).")
+        else ns.Print("/wfps duration 0-30 seconds (0.1-second steps; 0 = unlimited)") end
     elseif cmd == "status" then ns.Status()
     elseif cmd == "trace" then
         arg = arg:lower()
@@ -312,14 +401,19 @@ SlashCmdList.WINDFURYPROCSOUND = function(text)
     elseif cmd == "sound" then
         local target, choice = arg:match("^(weapon)%s+(.+)$")
         if not target then target, choice = arg:match("^(totem)%s+(.+)$") end
+        if not target then target, choice = arg:match("^(extra)%s+(.+)$") end
         choice = choice or arg
         local found
         for i, sound in ipairs(ns.sounds) do
             if choice == sound.id or tonumber(choice) == i then found = sound end
         end
         if found then ns.SelectSound(found.id, target); ns.Play(found.id, true, target)
-        else ns.Print("/wfps sound NUMBER sets both; /wfps sound weapon NUMBER or /wfps sound totem NUMBER sets one. Use 1-" .. #ns.sounds .. ".") end
+        else ns.Print("/wfps sound NUMBER sets all cues; /wfps sound weapon|totem|extra NUMBER sets one. Use 1-" .. #ns.sounds .. ".") end
+    elseif cmd == "extra" and (arg == "on" or arg == "off") then
+        ns.db.extra = arg == "on"; ns.detector.events = {}
+        ns.Print("Experimental other extra hit detection " .. (ns.db.extra and "on" or "off") .. ". Item procs on any class; Weaponmaster on warriors. Event delivery is unverified.")
+        if ns.RefreshOptions then ns.RefreshOptions() end
     elseif cmd == "reset" then ns.ResetOptions()
     elseif cmd == "" or cmd == "options" then ns.ShowOptions()
-    else ns.Print("/wfps options, test, sound 1-" .. #ns.sounds .. ", test totem, volume 0-100, stop, clearcounts, status, trace on|show|stop|clear, on, off, reset") end
+    else ns.Print("/wfps options, test [totem|extra], sound 1-" .. #ns.sounds .. ", extra on|off, duration 0-30, volume 0-100, stop, clearcounts, status, trace on|show|stop|clear, on, off, reset") end
 end

@@ -1,116 +1,177 @@
-# Windfury Proc Sound
+# Windfury/Extra Hit Proc Sound
 
-A small WoW **Forever** addon with **21 selectable sound cues** for the player's Windfury Weapon and Windfury Totem procs. Includes the native Warcraft wolf howl, chicken, and an original sci-fi blade cue.
+WoW **Forever** sound cues for Windfury Weapon, Windfury Totem, and experimental
+item/Sword extra attacks. **Version 0.6.1** adds Bonk, Fruit machine payout,
+silence cleanup, and a maximum sound duration in **0.1-second steps**. There are
+49 selectable cues, plus 17 preserved legacy choices. This build is based on
+the supplied **0.4.1 ZIP**, including its category dropdowns, speaker previews,
+expanded sound library, and LightsaberCrit default. Existing sound IDs and
+numbers are unchanged. The separate combo feature is not included.
 
-**Version 0.3.2:** a cleaner three-tab options window, compact sound grid, separate cue previews, and automatic sizing for smaller screens. All 0.3.1 sound timing, audio files, proc filters, and saved settings are preserved. Native UI rendering still needs in-game verification.
+## Install / update
 
-## Install on Windows
+1. Exit WoW completely. New audio files need a full game restart.
+2. Replace the `WindfuryProcSound` folder in
+   `World of Warcraft\_forever_\Interface\AddOns\` with the release's folder.
+3. Check for `AddOns\WindfuryProcSound\WindfuryProcSound.toc`, without an extra
+   nested folder. Enable **Windfury/Extra Hit Proc Sound** in the AddOns menu.
+4. Open `/wfps`. Existing saved sound/volume settings are retained.
 
-1. Exit World of Warcraft completely. A full restart ensures all audio files are available. Updating only from 0.3.1 to 0.3.2 changes no audio files, so `/reload` is sufficient when safe.
-2. Extract the release ZIP. Copy its **WindfuryProcSound** folder into:
-   `World of Warcraft\_forever_\Interface\AddOns\`
-3. Check that the final path is `...\AddOns\WindfuryProcSound\WindfuryProcSound.toc`, not a second nested folder.
-4. Start Forever. Enable **Windfury Proc Sound** in the character-selection AddOns menu.
-5. Type **/wfps**, select a sound, and click **Play** to preview it. The choice saves automatically.
-
-If building from this repository, copy the `WindfuryProcSound` subdirectory, not the whole repository.
-
-## Upgrade from the previous name
-
-The addon folder is now **WindfuryProcSound**. To import prior options automatically, leave the old addon installed and enabled for the first login after installing this folder. The new addon imports its settings and pauses its own automatic cues while the old addon is loaded. Then disable the old addon in the AddOns menu and reload the UI. The new settings are saved independently. Do not leave both versions enabled.
-
-If you already removed the old addon, the new version uses defaults. Your old saved-variable file is not deleted. The old `/wfs` shortcut still works when only the new addon is enabled.
+When building from source, copy only the `WindfuryProcSound` subdirectory.
+The old `WindfurySaber` addon's settings can be imported on first login if that
+addon is still enabled. New automatic cues pause while it is loaded; disable
+the old addon and reload after importing. `/wfs` remains an alias.
 
 ## Options
 
-Open `/wfps`, or **Settings → AddOns → Windfury Proc Sound → Open sound options** when supported.
+The top toggles separately control **Windfury Weapon**, **Windfury Totem**, and
+**Other extra hit sounds (experimental)**. The extra-hit option starts **off**.
 
-**Sounds tab**
-- All 21 choices appear in a compact three-column grid. The window scales down if needed to fit your screen.
-- Choose **Both**, **Weapon**, or **Totem**, then one of the 21 sound buttons. Each has a Play preview.
-- Weapon and Totem may use different cues. Existing selections automatically migrate to both.
-- **Warcraft Wolf Howl** now uses native game sound kits, replacing the non-Warcraft animal recording. No Blizzard audio is bundled. The known classic howl kit is tried first, with its modern equivalent as fallback; preview it to verify your client supports it.
+On **Sounds**, use the separate Weapon, Totem, and Other extra hits dropdowns.
+Choose a category, then a cue; submenus contain at most ten sounds. The speaker
+beside each dropdown previews its selection. Each group saves independently.
+**Use Weapon cue for both** copies Weapon to Totem and leaves Other extra hits
+unchanged. **Use Weapon cue for all** copies it to both other groups.
+Bonk is option **65**; Fruit machine payout is **66**. Selection
+previews are off by default.
 
-**Playback tab**
-- **Addon volume:** 0–100% in 10% steps. 0% mutes and stops the current addon cue. Other changes apply to subsequent cues.
-- **Master / SFX channel:** keeps your current choice. Game channel/master volume and mute settings still apply.
-- **Minimum gap:** 0–2 seconds in 0.1-second steps. Default 0 plays every detected proc; longer gaps limit audio without changing proc counts. Manual previews bypass this gap.
-- **Random cue each proc:** off by default; avoids immediately repeating the last random cue.
-- **Preview on selection:** off by default.
-- **Restore defaults** resets sounds and playback settings.
+The 0.4.1 library is retained: 49 active choices after adding the two new cues,
+and 17 retired effects whose saved selections and original command numbers
+still work. Retired choices stay out of random mode and normal browsing. A
+currently selected retired cue appears under **Saved legacy cue**. New users
+and Restore defaults use **LightsaberCrit proc**, as in 0.4.1.
 
-**Diagnostics tab**
-- Session proc counts, playback failures, muted/rate-limited cues, and readable/restricted event totals.
-- **Refresh**, **Reset counters** (keeps options), and **Print status**.
-- **Start trace**, **Show / stop**, and **Clear trace** for short troubleshooting captures.
+On **Playback**:
 
-Enable alerts and the Weapon/Totem toggles remain visible at the top. The selected cues, **Stop sound**, and separate **Preview Weapon / Preview Totem** buttons stay visible below every tab. Changes save automatically; Escape or **Close** dismisses the window.
+- **Addon volume:** 0–100% in 10% steps. Zero mutes and stops the current cue.
+  Custom clips use pre-rendered quieter files; native Warcraft wolf audio uses
+  SoundKit's volume override. Missing quiet files never fall back to full level.
+- **Audio channel:** Master or SFX. Existing game mute/volume settings apply;
+  the addon never changes global volume CVars.
+- **Max duration (s):** type `1.1`, `1.2`, `2.5`, etc., then Enter or click away.
+  Values snap to 0.1-second steps, from 0 through 30 seconds. **0 = unlimited**.
+  Applies to automatic cues and previews, including the native wolf. Changing
+  it adjusts the current cue's deadline relative to when that cue started.
+  Stops use zero fade padding; the game executes timers on frame boundaries.
+  Shorter files finish naturally. New cues cancel old deadlines.
+- **Minimum gap:** 0–2 seconds in 0.1-second steps. Limits audio, not proc counts.
+  Default 0 plays every detected proc; previews bypass this gap.
+- **Random cue each proc:** avoids immediately repeating the last random cue.
+- **Restore defaults:** resets selections and playback settings, including the
+  duration cap and the experimental extra-hit toggle.
 
-The addon never changes global volume CVars. Custom sounds use pre-rendered quieter files, with the full-level custom files at 100%; native Warcraft audio uses its per-sound SoundKit volume override. Missing quiet files never fall back to full volume. Only one addon cue plays at a time.
+Only one addon cue plays at a time. Closing the options saves changes
+automatically. Escape closes the window (or cancels an unfinished duration edit).
 
-Commands:
+**Diagnostics** shows session counts by group, playback failures, suppressed
+cues, and restricted/readable event totals. It also offers a short public-event
+trace. Reset counters keeps options.
+
+## Proc detection
+
+Windfury keeps its existing exact `SPELL_UPDATE_COOLDOWN` filters:
+
+| Type | Spell ID | Category | Class |
+| --- | --- | --- | --- |
+| Windfury Weapon | 439440 | 0 | Shaman |
+| Windfury Totem | 8516, 10608, 10610 | 2619 | Any player class |
+
+Both require base spell nil, recovery category 0, and item nil. Rank-1 Totem
+and Weapon signatures were observed in prior isolated live traces; higher
+Totem ranks are mapped from the known proc family. Generic refreshes, GCD and
+item updates, imbue casts, totem summons, and passive buff IDs are excluded.
+
+**Other extra hit sounds** groups these triggered spells under one sound choice:
+
+| Source | Extra-attack spell |
+| --- | --- |
+| Weaponmaster's Sword Specialization effect (warrior only) | 1257049 |
+| Hand of Justice (any player class) | 15601 |
+| Flurry Axe (any player class) | 18797 |
+| Thrash Blade (any player class) | 21919 |
+
+These identities are verified against Forever build **1.60.1.70938** client
+tables: each grants one extra attack. Hand of Justice's equipped passive
+15600 is deliberately excluded. Forever's Sword effect is part of Weaponmaster;
+the old Classic talent/application IDs are not treated as attacks.
+
+**Event delivery is unverified for these four extra-hit spells.** With the
+experiment enabled, the addon tries exact cooldown candidates
+`(procID, nil, 0, 0, nil)` and readable player casts/newly added player auras.
+The zero-category event shape is an inference, not a recorded Sword/item
+payload. Client spell data cannot prove that a public addon event is emitted.
+No warrior/item live test or other-player isolation test is claimed. See
+`SOURCES.md` for the source chain and the distinction between data and traces.
+
+Across all groups, a 0.25-second window matches duplicate notifications from
+different sources. Distinct same-source notifications stay distinct. Different
+item/Sword IDs cannot suppress one another; Windfury groups remain separate.
+There is no public shared event identifier, so incomplete closely spaced event
+sequences can still be ambiguous. Full aura snapshots and restricted values
+are ignored. No combat log, target-hit inference, networking or telemetry is used.
+
+## Commands / quick checks
 
 | Command | Action |
 | --- | --- |
 | `/wfps` | Open options |
-| `/wfps test` / `/wfps test totem` | Preview the selected Weapon / Totem sound |
-| `/wfps sound 1` | Set both proc sounds to option 1; supports numbers 1–21 or IDs |
-| `/wfps sound weapon 21` / `/wfps sound totem 3` | Change one proc's sound |
-| `/wfps volume 50` | Set addon volume, snapped to 10% steps |
-| `/wfps stop` | Stop the current addon sound |
-| `/wfps clearcounts` | Reset counters without changing options |
-| `/wfps status` | Show selections, volume, counts, muted/rate-limited cues and failures |
-| `/wfps on` / `/wfps off` | Enable / disable automatic cues |
+| `/wfps test` / `test totem` / `test extra` | Preview a group's selection |
+| `/wfps sound 65` | Set all three groups to Bonk and preview |
+| `/wfps sound extra 66` | Set only Other extra hits to Fruit machine payout |
+| `/wfps duration 1.2` | Cap cues at 1.2 seconds |
+| `/wfps duration 0` | Remove the duration cap |
+| `/wfps extra on` / `extra off` | Enable / disable experimental other extra hits |
+| `/wfps volume 50` | Set addon-only volume |
+| `/wfps stop` | Stop the owned cue and cancel its deadline |
+| `/wfps status` | Show selections, duration, counters and experiment state |
+| `/wfps clearcounts` | Clear counters, keep options |
+| `/wfps on` / `off` | Enable / disable automatic cues |
 | `/wfps reset` | Restore defaults and clear counters |
-| `/wfps trace on` / `/wfps trace show` | Start / stop and show a short diagnostic trace |
-| `/wfps trace stop` / `/wfps trace clear` | Stop / remove the trace |
+| `/wfps trace on` / `trace show` | Start / stop and show a diagnostic trace |
+| `/wfps trace stop` / `trace clear` | Stop / remove the trace |
 
-## Quicker sound starts
+For a smell test, preview the two new cues, then set a fractional duration and
+preview Fruit machine payout again. A working preview validates playback only.
+For experimental detection, enable Other extra hit sounds and capture a short
+trace while using one of the listed items or Weaponmaster with a sword. Compare
+an isolated test with another player proccing while you are idle.
 
-Version 0.3.1 removes 459.8 ms of near-silence from LightsaberCrit proc and 6.1–18.3 ms from 13 other custom clips. Six clips already started promptly and were left byte-identical. At least 5 ms before the audible attack is retained to avoid abrupt starts; tails and levels are preserved. All quieter volume copies are rebuilt from these sources. The native Warcraft wolf plays from game data and cannot be trimmed by the addon.
+Traces stop after 30 seconds and retain the latest 120 public numeric IDs and
+relative times. `/reload` or normal logout saves them. They contain no names,
+GUIDs, damage amounts or restricted payload values, and are never transmitted.
 
-## Proc detection
+## Sound processing and provenance
 
-The main detector uses exact `SPELL_UPDATE_COOLDOWN` payloads:
+The complete 0.4.1 library is retained, with the two requested uploads appended.
+All 65 custom originals were checked. Seventeen baseline clips had 1,671.791 ms
+of trailing padding removed in total; 46 baseline originals remain byte-identical.
+Explosion blast and Whip crack retain about 40 ms of tail padding each because
+a lossy re-encode exceeded the waveform-quality guard. The two new cues retain
+their previously reviewed trims (Bonk about 0.402 s; Fruit machine about 3.702 s).
+Trimming checks padding at both ends using a -60 dBFS
+threshold across every channel, retaining at least 5 ms around the first/last
+audible sample. Interior pauses and audible decay remain. A separate immutable
+archive is used for this 0.4.1-based pass. The native wolf remains game-owned
+and has no bundled file to edit. See the current validation report and each
+catalog entry for exact trim amounts and output hashes.
 
-- **Windfury Weapon:** spell `439440`, base spell nil, category `0`, recovery category `0`, item nil. Enabled only on a shaman.
-- **Windfury Totem:** spell `8516`, `10608`, or `10610`, base spell nil, category `2619`, recovery category `0`, item nil. Totem recipients may be any player class. The rank-1 signature (`8516`) was observed live; higher ranks are mapped from the known proc family and are not yet live-tested.
-
-Weapon and Totem have independent toggles and counts. The summon IDs `8512`, `10613`, `10614`, passive totem-buff IDs, and weapon-imbue application casts are excluded. Generic cooldown refreshes, GCD events, item events, unknown signatures and restricted values are ignored. No damage timing, target-hit inference, combat log, or other-player unit feed is used.
-
-Readable player casts and newly added player auras remain a legacy fallback. The failed original implementation relied on those events alone; the isolated traces showed only cooldown notifications for the observed procs.
-A 0.25-second matching window suppresses duplicate cooldown/cast/aura notifications of the same proc type. Distinct same-source notifications remain distinct. Since the game does not supply a common public identifier across the sources, extremely closely spaced incomplete event sequences can be ambiguous. Restricted values are discarded before comparison or table indexing. Full aura snapshots are not treated as new procs.
-
-No WeakAuras, GaleCount, or other addon is required. No hidden combat data is extracted or bypassed. No networking or telemetry is included.
-
-## Investigating missing proc sounds
-
-1. `/wfps test`: confirms installation and audio playback.
-2. On a character using Windfury Weapon, attack a target and compare observed procs with `/wfps status`.
-3. Check that applying Windfury and other players' procs do not play the cue.
-4. Repeat with Windfury Totem if desired.
-5. If previews work but no actual procs are detected, the current client may not expose the required public notifications. A successful preview does not validate proc detection.
-
-For a short diagnostic capture:
-
-1. Run `/wfps trace on`, then attack until you see a Windfury proc.
-2. Run `/wfps trace show` promptly. Capture stops automatically after 30 seconds.
-3. Share the summary and whether you observed your own proc. Separately test with another player proccing while you do not attack.
-4. `/reload` or normal logout saves the trace with addon settings. Do this when convenient, outside combat. `/wfps trace clear` removes it.
-
-The trace keeps the latest 120 public numeric spell/category IDs and relative times. Older rows are omitted if the limit is reached. It stores no character names, GUIDs, damage amounts, or restricted payload values, and sends nothing anywhere. Tracing does not change normal sound triggers. The addon retains the two isolated cooldown signatures above. Party isolation, additional client builds and higher Totem ranks remain unverified. See `SOURCES.md`.
-
-## Sound rights and provenance
-
-The bundled sci-fi blade is an **original synthesized sound**, not the exact audio from the linked Wago aura or a Star Wars recording. Chicken is a real recording; the Warcraft wolf plays from the installed game. Other effects come from the creator's CC0 sound pack. The separately requested LightsaberCrit proc file is not part of that CC0/original set and is louder than the normalized cues. See `WindfuryProcSound/SOUND_CREDITS.md` for the complete asset list, source URLs, licenses, and processing notes.
+All original 0.4.1 source credits, asset licenses, category labels and retired
+IDs are preserved. See `EXPANSION_CREDITS.md`, `LEGACY_AUDIO_PROVENANCE.md`,
+`SOUND_CREDITS.md`, and `sound-catalog.json`. The two user-requested YouTube
+uploads have unverified redistribution rights and are not covered by the code's
+MIT license. This build contains 65 custom originals and 585 quieter variants.
 
 ## Development
 
-- `lua tests/test.lua` with Lua 5.1+ (WoW-compatible Lua syntax), or `python3 tools/run_lua.py` with system liblua 5.3/5.4.
-- `python3 tools/package.py` verifies the manifest and creates `dist/WindfuryProcSound-0.3.2.zip`.
-- Tests use mocked WoW APIs. They do not emulate Blizzard's secret-value engine or verify real game delivery.
-- `python3 tools/prepare_volume.py --verify-only` verifies all 180 quieter custom-file variants and their hashes, amplitude, duration and decoding.
+- `lua tests/test.lua` (Lua 5.1+) runs 645 assertions using the real modules
+  with mocked WoW APIs.
+  `python tools/run_lua.py` also supports system liblua 5.3/5.4.
+- `python tests/test_audio.py` tests conservative edge trimming (numpy required).
+- `python tools/trim_silence.py --verify-only` checks the immutable trim archive.
+- `python tools/prepare_volume.py --verify-only` checks all volume banks.
+- `python tools/package.py` validates catalog/hashes/TOCs and builds
+  `dist/WindfuryProcSound-0.6.1.zip`.
 
-## License
-
-Original addon code is MIT. Nineteen custom cues have original/CC0 provenance. Native Warcraft audio is not redistributed. The additional LightsaberCrit file has unverified audio-rights coverage. See the credits. World of Warcraft and Star Wars are trademarks of their respective owners. This project is unofficial and unaffiliated.
+Mocked tests do not emulate the client's secret-value engine or establish real
+event delivery, native audio availability or UI rendering. Original code is MIT;
+see the audio credits for asset-specific terms. This project is unofficial.
